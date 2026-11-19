@@ -3,9 +3,13 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { toUtcIso } from '@/lib/time';
 
 export interface NotificationSettings {
+  enabled: boolean;
   rateEnabled: boolean;
   productionEnabled: boolean;
   lowStockEnabled: boolean;
+  rateTime: string;
+  productionTime: string;
+  lowStockTime: string;
 }
 
 export async function getNotificationSettings(
@@ -19,9 +23,13 @@ export async function getNotificationSettings(
   );
   const values = new Map(rows.map((row) => [row.key, row.value]));
   return {
+    enabled: values.get('notification.enabled') !== 'false',
     rateEnabled: values.get('notification.rate') !== 'false',
     productionEnabled: values.get('notification.production') !== 'false',
     lowStockEnabled: values.get('notification.low_stock') !== 'false',
+    rateTime: values.get('notification.rate_time') ?? '06:00',
+    productionTime: values.get('notification.production_time') ?? '16:00',
+    lowStockTime: values.get('notification.low_stock_time') ?? '08:00',
   };
 }
 
@@ -32,10 +40,14 @@ export async function saveNotificationSettings(
   now = toUtcIso()
 ): Promise<void> {
   await db.withTransactionAsync(async () => {
-    const entries: [string, boolean][] = [
-      ['notification.rate', settings.rateEnabled],
-      ['notification.production', settings.productionEnabled],
-      ['notification.low_stock', settings.lowStockEnabled],
+    const entries: [string, string][] = [
+      ['notification.enabled', String(settings.enabled)],
+      ['notification.rate', String(settings.rateEnabled)],
+      ['notification.production', String(settings.productionEnabled)],
+      ['notification.low_stock', String(settings.lowStockEnabled)],
+      ['notification.rate_time', settings.rateTime],
+      ['notification.production_time', settings.productionTime],
+      ['notification.low_stock_time', settings.lowStockTime],
     ];
     for (const [key, value] of entries) {
       await db.runAsync(
@@ -46,7 +58,7 @@ export async function saveNotificationSettings(
            updated_at = excluded.updated_at`,
         factoryId,
         key,
-        value ? 'true' : 'false',
+        value,
         now
       );
     }

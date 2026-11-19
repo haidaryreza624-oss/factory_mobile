@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
+import { AppTextInput } from '@/components/ui/app-text-input';
 import { Card } from '@/components/ui/card';
 import { Screen } from '@/components/ui/screen';
 import { ScreenHeader } from '@/components/ui/screen-header';
@@ -15,6 +16,7 @@ import {
   type NotificationSettings,
 } from '@/db/repositories/notification-settings';
 import { fa } from '@/i18n';
+import { parseNotificationTime } from '@/domain/notification-time';
 import { useTheme } from '@/hooks/use-theme';
 import { useApp } from '@/providers/app-provider';
 import { useDatabase } from '@/providers/database-provider';
@@ -32,11 +34,17 @@ export default function NotificationsScreen() {
   const db = useDatabase();
   const { factory } = useApp();
   const theme = useTheme();
-  const [permission, setPermission] = useState<Notifications.PermissionStatus>('undetermined');
+  const [permission, setPermission] = useState<Notifications.PermissionStatus>(
+    Notifications.PermissionStatus.UNDETERMINED
+  );
   const [settings, setSettings] = useState<NotificationSettings>({
+    enabled: true,
     rateEnabled: true,
     productionEnabled: true,
     lowStockEnabled: true,
+    rateTime: '06:00',
+    productionTime: '16:00',
+    lowStockTime: '08:00',
   });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
@@ -61,14 +69,18 @@ export default function NotificationsScreen() {
 
   const requestPermission = async () => {
     setError(null);
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('factory-reminders', {
-        name: 'یادآوری‌های فابریکه',
-        importance: Notifications.AndroidImportance.DEFAULT,
-      });
+    try {
+      // Android notification channels are not required for the default channel.
+      // Creating an extra channel through Expo Go can trigger a native NPE.
+      const result = await Notifications.requestPermissionsAsync();
+      setPermission(result.status);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'مجوز اعلان در دستگاه فعال نشد.'
+      );
     }
-    const result = await Notifications.requestPermissionsAsync();
-    setPermission(result.status);
   };
 
   const toggle = (key: keyof NotificationSettings) => {
@@ -77,6 +89,14 @@ export default function NotificationsScreen() {
 
   const save = async () => {
     if (!factory) return;
+    const rateTime = parseNotificationTime(settings.rateTime);
+    const productionTime = parseNotificationTime(settings.productionTime);
+    const lowStockTime = parseNotificationTime(settings.lowStockTime);
+    if (!rateTime || !productionTime || !lowStockTime) {
+      setError(fa.notifications.invalidTime);
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setSuccess(null);
@@ -84,7 +104,7 @@ export default function NotificationsScreen() {
       await saveNotificationSettings(db, factory.id, settings);
       await Notifications.cancelAllScheduledNotificationsAsync();
 
-      if (permission === 'granted') {
+      if (settings.enabled && permission === 'granted') {
         if (settings.rateEnabled) {
           await Notifications.scheduleNotificationAsync({
             content: {
@@ -94,8 +114,7 @@ export default function NotificationsScreen() {
             },
             trigger: {
               type: Notifications.SchedulableTriggerInputTypes.DAILY,
-              hour: 6,
-              minute: 0,
+              ...rateTime,
             },
           });
         }
@@ -108,8 +127,7 @@ export default function NotificationsScreen() {
             },
             trigger: {
               type: Notifications.SchedulableTriggerInputTypes.DAILY,
-              hour: 16,
-              minute: 0,
+              ...productionTime,
             },
           });
         }
@@ -122,8 +140,7 @@ export default function NotificationsScreen() {
             },
             trigger: {
               type: Notifications.SchedulableTriggerInputTypes.DAILY,
-              hour: 8,
-              minute: 0,
+              ...lowStockTime,
             },
           });
         }
@@ -136,13 +153,14 @@ export default function NotificationsScreen() {
     }
   };
 
-  const options: Array<{
-    key: keyof NotificationSettings;
+  const options: {
+    key: 'rateEnabled' | 'productionEnabled' | 'lowStockEnabled';
+    timeKey: 'rateTime' | 'productionTime' | 'lowStockTime';
     label: string;
-  }> = [
-    { key: 'rateEnabled', label: fa.notifications.rateReminder },
-    { key: 'productionEnabled', label: fa.notifications.productionReminder },
-    { key: 'lowStockEnabled', label: fa.notifications.lowStockReminder },
+  }[] = [
+    { key: 'rateEnabled', timeKey: 'rateTime', label: fa.notifications.rateReminder },
+    { key: 'productionEnabled', timeKey: 'productionTime', label: fa.notifications.productionReminder },
+    { key: 'lowStockEnabled', timeKey: 'lowStockTime', label: fa.notifications.lowStockReminder },
   ];
 
   return (
@@ -159,6 +177,32 @@ export default function NotificationsScreen() {
         ) : null}
       </Card>
 
+      <Card>
+        <View style={styles.settingRow}>
+          <ThemedText type="smallBold" style={styles.settingLabel}>
+            {settings.enabled ? fa.notifications.all : fa.notifications.deactivateAll}
+          </ThemedText>
+          <Pressable
+            accessibilityRole="switch"
+            accessibilityState={{ checked: settings.enabled }}
+            onPress={() => toggle('enabled')}
+            style={[
+              styles.switch,
+              { backgroundColor: settings.enabled ? theme.primary : theme.surfaceMuted },
+            ]}>
+            <View
+              style={[
+                styles.switchThumb,
+                {
+                  backgroundColor: theme.primaryText,
+                  transform: [{ translateX: settings.enabled ? 18 : 0 }],
+                },
+              ]}
+            />
+          </Pressable>
+        </View>
+      </Card>
+
       {options.map((option) => (
         <Card key={option.key}>
           <View style={styles.settingRow}>
@@ -166,10 +210,14 @@ export default function NotificationsScreen() {
             <Pressable
               accessibilityRole="switch"
               accessibilityState={{ checked: settings[option.key] }}
+              disabled={!settings.enabled}
               onPress={() => toggle(option.key)}
               style={[
                 styles.switch,
-                { backgroundColor: settings[option.key] ? theme.primary : theme.surfaceMuted },
+                  {
+                    backgroundColor: settings[option.key] ? theme.primary : theme.surfaceMuted,
+                    opacity: settings.enabled ? 1 : 0.45,
+                  },
               ]}>
               <View
                 style={[
@@ -182,6 +230,17 @@ export default function NotificationsScreen() {
               />
             </Pressable>
           </View>
+          <AppTextInput
+            label={fa.notifications.time}
+            hint={fa.notifications.timeHint}
+            value={settings[option.timeKey]}
+            onChangeText={(value) =>
+              setSettings((current) => ({ ...current, [option.timeKey]: value }))
+            }
+            editable={settings.enabled && settings[option.key]}
+            keyboardType="numbers-and-punctuation"
+            placeholder="06:30"
+          />
         </Card>
       ))}
 
