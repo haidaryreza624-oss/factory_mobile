@@ -1,4 +1,5 @@
-import { Alert, StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Badge } from '@/components/ui/badge';
@@ -11,24 +12,16 @@ import { Spacing } from '@/constants/theme';
 import { fa } from '@/i18n';
 
 export default function FinanceScreen() {
-  const showComingSoon = () => {
-    Alert.alert(fa.common.comingSoon, fa.common.comingSoonBody);
-  };
-
   const features = [
-    { title: fa.finance.expenses, body: fa.finance.expensesBody, icon: Icons.receipt },
+    { title: fa.finance.expenses, body: fa.finance.expensesBody, icon: Icons.receipt, href: '/business-expenses' as const },
+    { title: fa.finance.personal, body: fa.finance.personalBody, icon: Icons.person, href: '/personal-finance' as const },
     { title: fa.finance.exchange, body: fa.finance.exchangeBody, icon: Icons.rate },
     { title: fa.finance.ownerTransfers, body: fa.finance.ownerTransfersBody, icon: Icons.wallet },
-    { title: fa.finance.personal, body: fa.finance.personalBody, icon: Icons.person },
   ];
 
   return (
     <Screen>
       <ScreenHeader title={fa.finance.title} subtitle={fa.finance.subtitle} />
-
-      <ThemedText type="small" themeColor="textSecondary" style={styles.intro}>
-        {fa.finance.soon}
-      </ThemedText>
 
       <Card padded={false}>
         {features.map((feature) => (
@@ -37,8 +30,8 @@ export default function FinanceScreen() {
             icon={feature.icon}
             title={feature.title}
             subtitle={feature.body}
-            trailing={<Badge label={fa.common.comingSoon} />}
-            onPress={showComingSoon}
+            trailing={feature.href ? undefined : <Badge label={fa.common.comingSoon} />}
+            onPress={feature.href ? () => router.push(feature.href) : undefined}
           />
         ))}
       </Card>
