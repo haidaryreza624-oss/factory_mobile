@@ -27,6 +27,20 @@ export default function MoreScreen() {
 
       <Card padded={false}>
         <ListRow
+          icon={Icons.chart}
+          title={fa.more.reports}
+          subtitle={fa.more.reportsBody}
+          onPress={() => router.push('/reports')}
+          showChevron
+        />
+        <ListRow
+          icon={Icons.calendar}
+          title={fa.more.notifications}
+          subtitle={fa.more.notificationsBody}
+          onPress={() => router.push('/notifications')}
+          showChevron
+        />
+        <ListRow
           icon={Icons.factory}
           title={factory?.name ?? fa.common.notSet}
           subtitle={fa.more.business}
