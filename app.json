@@ -1,16 +1,19 @@
 {
   "expo": {
-    "name": "factory_mangement",
-    "slug": "factory_mangement",
+    "name": "مدیریت فابریکه",
+    "slug": "factory-management",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "factorymangement",
+    "scheme": "factorymanagement",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.reza.factorymanagement",
+      "supportsTablet": false
     },
     "android": {
+      "package": "com.reza.factorymanagement",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -26,13 +29,24 @@
     "plugins": [
       "expo-router",
       [
+        "expo-localization",
+        {
+          "supportsRTL": true,
+          "forcesRTL": true,
+          "supportedLocales": [
+            "fa"
+          ]
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,
