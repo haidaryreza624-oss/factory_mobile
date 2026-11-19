@@ -53,6 +53,63 @@ export interface DashboardSnapshot {
   pendingSyncCount: number;
 }
 
+export interface RawMaterialRow {
+  id: string;
+  factory_id: string;
+  name: string;
+  description: string | null;
+  unit: string;
+  minimum_stock_grams: number;
+  expected_yield_milli: number;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface RawMaterial {
+  id: string;
+  factoryId: string;
+  name: string;
+  description: string | null;
+  unit: 'KG';
+  minimumStockGrams: number;
+  expectedYieldMilli: number;
+  isActive: boolean;
+  currentStockGrams: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StockMovementRow {
+  id: string;
+  factory_id: string;
+  stock_type: 'raw_material' | 'finished_product';
+  stock_item_id: string;
+  quantity_grams: number;
+  resulting_balance_grams: number;
+  movement_type: string;
+  source_type: string | null;
+  source_id: string | null;
+  memo: string | null;
+  occurred_at: string;
+  created_at: string;
+}
+
+export interface StockMovement {
+  id: string;
+  stockType: 'raw_material' | 'finished_product';
+  stockItemId: string;
+  quantityGrams: number;
+  resultingBalanceGrams: number;
+  movementType: string;
+  sourceType: string | null;
+  sourceId: string | null;
+  memo: string | null;
+  occurredAt: string;
+  createdAt: string;
+}
+
 export function mapFactory(row: FactoryRow): Factory {
   return {
     id: row.id,

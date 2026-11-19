@@ -42,9 +42,8 @@ export function AppProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let cancelled = false;
 
-    setStatus('loading');
-    setError(null);
-
+    // Loading provider state from the database is asynchronous; updates happen only after the promise settles.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
       .catch((cause: unknown) => {
         if (!cancelled) {
@@ -73,7 +72,11 @@ export function AppProvider({ children }: PropsWithChildren) {
     return (
       <FatalErrorScreen
         message={error ?? undefined}
-        onRetry={() => setAttempt((value) => value + 1)}
+        onRetry={() => {
+          setError(null);
+          setStatus('loading');
+          setAttempt((value) => value + 1);
+        }}
       />
     );
   }

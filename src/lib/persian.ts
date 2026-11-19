@@ -6,7 +6,6 @@
  */
 
 const PERSIAN_DIGITS = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-const ARABIC_INDIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
 
 const PERSIAN_DIGIT_PATTERN = /[۰-۹]/g;
 const ARABIC_INDIC_DIGIT_PATTERN = /[٠-٩]/g;

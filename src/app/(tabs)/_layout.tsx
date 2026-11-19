@@ -10,6 +10,8 @@ import { useApp } from '@/providers/app-provider';
 export default function TabsLayout() {
   const { factory } = useApp();
   const theme = useTheme();
+  const tabIconColor = (color: unknown) =>
+    typeof color === 'string' ? color : theme.textSecondary;
 
   if (!factory) {
     return <Redirect href="/setup" />;
@@ -41,7 +43,7 @@ export default function TabsLayout() {
         options={{
           title: fa.tabs.dashboard,
           tabBarIcon: ({ color, size }) => (
-            <Icon name={Icons.dashboard} size={size} color={color} />
+            <Icon name={Icons.dashboard} size={size} color={tabIconColor(color)} />
           ),
         }}
       />
@@ -50,7 +52,7 @@ export default function TabsLayout() {
         options={{
           title: fa.tabs.inventory,
           tabBarIcon: ({ color, size }) => (
-            <Icon name={Icons.inventory} size={size} color={color} />
+            <Icon name={Icons.inventory} size={size} color={tabIconColor(color)} />
           ),
         }}
       />
@@ -59,7 +61,7 @@ export default function TabsLayout() {
         options={{
           title: fa.tabs.operations,
           tabBarIcon: ({ color, size }) => (
-            <Icon name={Icons.operations} size={size} color={color} />
+            <Icon name={Icons.operations} size={size} color={tabIconColor(color)} />
           ),
         }}
       />
@@ -68,7 +70,7 @@ export default function TabsLayout() {
         options={{
           title: fa.tabs.finance,
           tabBarIcon: ({ color, size }) => (
-            <Icon name={Icons.finance} size={size} color={color} />
+            <Icon name={Icons.finance} size={size} color={tabIconColor(color)} />
           ),
         }}
       />
@@ -76,7 +78,9 @@ export default function TabsLayout() {
         name="more"
         options={{
           title: fa.tabs.more,
-          tabBarIcon: ({ color, size }) => <Icon name={Icons.more} size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Icon name={Icons.more} size={size} color={tabIconColor(color)} />
+          ),
         }}
       />
     </Tabs>
