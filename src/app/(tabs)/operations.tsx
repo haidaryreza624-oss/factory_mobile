@@ -19,7 +19,7 @@ export default function OperationsScreen() {
   const features = [
     { title: fa.operations.purchases, body: fa.operations.purchasesBody, icon: Icons.cart, href: '/purchases' as const },
     { title: fa.operations.production, body: fa.operations.productionBody, icon: Icons.operations, href: '/production' as const },
-    { title: fa.operations.sales, body: fa.operations.salesBody, icon: Icons.receipt },
+    { title: fa.operations.sales, body: fa.operations.salesBody, icon: Icons.receipt, href: '/sales' as const },
   ];
 
   return (
