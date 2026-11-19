@@ -216,6 +216,40 @@ export interface Sale {
   updatedAt: string;
 }
 
+export interface FinanceCategory {
+  id: string;
+  name: string;
+  scope: 'business' | 'personal';
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessExpense {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  expenseDate: string;
+  amountAfn: number;
+  description: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PersonalTransaction {
+  id: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  transactionType: 'income' | 'expense';
+  transactionDate: string;
+  amountAfn: number;
+  description: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export function mapFactory(row: FactoryRow): Factory {
   return {
     id: row.id,
