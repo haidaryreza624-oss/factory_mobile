@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
 import { ThemedText } from '@/components/themed-text';
@@ -49,13 +49,35 @@ export default function NotificationsScreen() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+
+  const log = (event: string, details?: unknown) => {
+    const detailText = details === undefined ? '' : ` ${JSON.stringify(details)}`;
+    const entry = `${new Date().toLocaleTimeString()} ${event}${detailText}`;
+    console.info('[notifications]', event, details ?? '');
+    setDebugLogs((current) => [entry, ...current].slice(0, 12));
+  };
 
   useEffect(() => {
     Notifications.getPermissionsAsync()
-      .then((result) => setPermission(result.status))
-      .catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : String(cause))
-      );
+      .then((result) => {
+        setPermission(result.status);
+        log('permission status', result.status);
+      })
+      .catch((cause: unknown) => {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        log('permission check failed', message);
+        setError(message);
+      });
+
+    const received = Notifications.addNotificationReceivedListener((notification) => {
+      log('notification received', {
+        identifier: notification.request.identifier,
+        title: notification.request.content.title,
+      });
+    });
+
+    return () => received.remove();
   }, []);
 
   useEffect(() => {
@@ -74,12 +96,14 @@ export default function NotificationsScreen() {
       // Creating an extra channel through Expo Go can trigger a native NPE.
       const result = await Notifications.requestPermissionsAsync();
       setPermission(result.status);
+      log('permission request result', result.status);
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
           : 'مجوز اعلان در دستگاه فعال نشد.'
       );
+      log('permission request failed', cause instanceof Error ? cause.message : String(cause));
     }
   };
 
@@ -94,6 +118,7 @@ export default function NotificationsScreen() {
     const lowStockTime = parseNotificationTime(settings.lowStockTime);
     if (!rateTime || !productionTime || !lowStockTime) {
       setError(fa.notifications.invalidTime);
+      log('schedule rejected: invalid time');
       return;
     }
 
@@ -102,11 +127,21 @@ export default function NotificationsScreen() {
     setSuccess(null);
     try {
       await saveNotificationSettings(db, factory.id, settings);
+      log('settings saved', {
+        enabled: settings.enabled,
+        rateEnabled: settings.rateEnabled,
+        rateTime: settings.rateTime,
+        productionEnabled: settings.productionEnabled,
+        productionTime: settings.productionTime,
+        lowStockEnabled: settings.lowStockEnabled,
+        lowStockTime: settings.lowStockTime,
+      });
       await Notifications.cancelAllScheduledNotificationsAsync();
+      log('previous scheduled notifications cancelled');
 
       if (settings.enabled && permission === 'granted') {
         if (settings.rateEnabled) {
-          await Notifications.scheduleNotificationAsync({
+          const identifier = await Notifications.scheduleNotificationAsync({
             content: {
               title: fa.notifications.rateReminder,
               body: 'نرخ دالر امروز را ثبت کنید.',
@@ -117,9 +152,10 @@ export default function NotificationsScreen() {
               ...rateTime,
             },
           });
+          log('rate reminder scheduled', { identifier, time: settings.rateTime });
         }
         if (settings.productionEnabled) {
-          await Notifications.scheduleNotificationAsync({
+          const identifier = await Notifications.scheduleNotificationAsync({
             content: {
               title: fa.notifications.productionReminder,
               body: 'تولید امروز را ثبت کنید.',
@@ -130,9 +166,13 @@ export default function NotificationsScreen() {
               ...productionTime,
             },
           });
+          log('production reminder scheduled', {
+            identifier,
+            time: settings.productionTime,
+          });
         }
         if (settings.lowStockEnabled) {
-          await Notifications.scheduleNotificationAsync({
+          const identifier = await Notifications.scheduleNotificationAsync({
             content: {
               title: fa.notifications.lowStockReminder,
               body: 'موجودی مواد اولیه را بررسی کنید.',
@@ -143,13 +183,62 @@ export default function NotificationsScreen() {
               ...lowStockTime,
             },
           });
+          log('low-stock reminder scheduled', {
+            identifier,
+            time: settings.lowStockTime,
+          });
         }
+      } else {
+        log('reminders not scheduled', {
+          enabled: settings.enabled,
+          permission,
+        });
+      }
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      log('scheduled notification count', scheduled.length);
+      for (const notification of scheduled) {
+        log('scheduled notification verified', {
+          identifier: notification.identifier,
+          title: notification.content.title,
+          trigger: notification.trigger,
+        });
       }
       setSuccess(fa.notifications.saved);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
+      log('schedule failed', cause instanceof Error ? cause.message : String(cause));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const sendTestNotification = async () => {
+    setError(null);
+    if (permission !== 'granted') {
+      setError(fa.notifications.testNeedsPermission);
+      log('test notification blocked: permission not granted', permission);
+      return;
+    }
+
+    try {
+      const identifier = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: fa.notifications.testTitle,
+          body: fa.notifications.testBody,
+          data: { url: '/rate' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 5,
+          repeats: false,
+        },
+      });
+      log('test notification scheduled for 5 seconds', { identifier });
+      setSuccess(fa.notifications.testScheduled);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      setError(message);
+      log('test notification failed', message);
     }
   };
 
@@ -176,6 +265,14 @@ export default function NotificationsScreen() {
           <AppButton label={fa.notifications.requestPermission} onPress={requestPermission} />
         ) : null}
       </Card>
+
+      {Platform.OS !== 'web' ? (
+        <AppButton
+          label={fa.notifications.sendTest}
+          variant="secondary"
+          onPress={sendTestNotification}
+        />
+      ) : null}
 
       <Card>
         <View style={styles.settingRow}>
@@ -247,6 +344,17 @@ export default function NotificationsScreen() {
       {error ? <Card tone="danger"><ThemedText type="small" style={{ color: theme.danger }}>{error}</ThemedText></Card> : null}
       {success ? <Card tone="success"><ThemedText type="small" style={{ color: theme.success }}>{success}</ThemedText></Card> : null}
       <AppButton label={fa.notifications.save} onPress={save} loading={saving} />
+
+      <Card>
+        <ThemedText type="smallBold">{fa.notifications.diagnostics}</ThemedText>
+        {debugLogs.length === 0 ? (
+          <ThemedText type="caption" themeColor="textSecondary">{fa.notifications.noDiagnostics}</ThemedText>
+        ) : debugLogs.map((entry, index) => (
+          <ThemedText key={`${index}-${entry}`} type="caption" themeColor="textSecondary">
+            {entry}
+          </ThemedText>
+        ))}
+      </Card>
     </Screen>
   );
 }

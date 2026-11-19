@@ -58,6 +58,10 @@ function AppNavigation({ backgroundColor }: { backgroundColor: string }) {
       if (handledNotificationId.current === request.identifier) return;
 
       const destination = request.content.data?.url;
+      console.info('[notifications] notification tapped', {
+        identifier: request.identifier,
+        destination,
+      });
       if (
         destination !== '/rate' &&
         destination !== '/production' &&
@@ -68,6 +72,7 @@ function AppNavigation({ backgroundColor }: { backgroundColor: string }) {
 
       handledNotificationId.current = request.identifier;
       router.push(destination);
+      console.info('[notifications] navigating from notification', destination);
       Notifications.clearLastNotificationResponse();
     };
 
