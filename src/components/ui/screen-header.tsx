@@ -3,7 +3,6 @@ import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconButton } from '@/components/ui/icon-button';
-import { Icons } from '@/constants/icons';
 import { Spacing } from '@/constants/theme';
 import { fa } from '@/i18n';
 

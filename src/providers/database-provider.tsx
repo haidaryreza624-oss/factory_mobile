@@ -23,8 +23,6 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let cancelled = false;
 
-    setError(null);
-
     getDatabase()
       .then((database) => {
         if (!cancelled) {
@@ -43,7 +41,15 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
   }, [attempt]);
 
   if (error) {
-    return <FatalErrorScreen message={error} onRetry={() => setAttempt((value) => value + 1)} />;
+    return (
+      <FatalErrorScreen
+        message={error}
+        onRetry={() => {
+          setError(null);
+          setAttempt((value) => value + 1);
+        }}
+      />
+    );
   }
 
   if (!db) {

@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { up as upInitial } from './001-initial';
+import { up as upInventory } from './002-inventory';
 
 export interface Migration {
   version: number;
@@ -13,6 +14,11 @@ export const migrations: Migration[] = [
     version: 1,
     name: 'initial',
     up: upInitial,
+  },
+  {
+    version: 2,
+    name: 'inventory',
+    up: upInventory,
   },
 ];
 
