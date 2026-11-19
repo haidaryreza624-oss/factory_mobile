@@ -177,6 +177,45 @@ export interface ProductionBatch {
   updatedAt: string;
 }
 
+export interface Customer {
+  id: string;
+  factoryId: string;
+  name: string;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaleItem {
+  id: string;
+  finishedProductId: string;
+  quantityGrams: number;
+  unitPriceMinor: number;
+  lineTotalMinor: number;
+}
+
+export interface Sale {
+  id: string;
+  customerId: string;
+  customerName: string;
+  saleDate: string;
+  currency: Currency;
+  totalOriginalMinor: number;
+  totalAfn: number;
+  exchangeRateMilli: number | null;
+  paidAfn: number;
+  outstandingAfn: number;
+  paymentStatus: 'unpaid' | 'partial' | 'paid';
+  reference: string | null;
+  notes: string | null;
+  items: SaleItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export function mapFactory(row: FactoryRow): Factory {
   return {
     id: row.id,

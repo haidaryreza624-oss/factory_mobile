@@ -4,6 +4,7 @@ import { up as upInitial } from './001-initial';
 import { up as upInventory } from './002-inventory';
 import { up as upPurchases } from './003-purchases';
 import { up as upProduction } from './004-production';
+import { up as upSales } from './005-sales';
 
 export interface Migration {
   version: number;
@@ -31,6 +32,11 @@ export const migrations: Migration[] = [
     version: 4,
     name: 'production',
     up: upProduction,
+  },
+  {
+    version: 5,
+    name: 'sales',
+    up: upSales,
   },
 ];
 
