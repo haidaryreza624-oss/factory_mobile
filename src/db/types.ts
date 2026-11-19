@@ -110,6 +110,46 @@ export interface StockMovement {
   createdAt: string;
 }
 
+export interface Supplier {
+  id: string;
+  factoryId: string;
+  name: string;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PurchaseItem {
+  id: string;
+  rawMaterialId: string;
+  rawMaterialName: string;
+  quantityGrams: number;
+  unitPriceMinor: number;
+  lineTotalMinor: number;
+}
+
+export interface Purchase {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  purchaseDate: string;
+  currency: Currency;
+  totalOriginalMinor: number;
+  totalAfn: number;
+  exchangeRateMilli: number | null;
+  paidAfn: number;
+  outstandingAfn: number;
+  paymentStatus: 'unpaid' | 'partial' | 'paid';
+  reference: string | null;
+  notes: string | null;
+  items: PurchaseItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export function mapFactory(row: FactoryRow): Factory {
   return {
     id: row.id,
