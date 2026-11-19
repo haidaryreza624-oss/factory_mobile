@@ -150,6 +150,33 @@ export interface Purchase {
   updatedAt: string;
 }
 
+export interface ProductionInput {
+  id: string;
+  rawMaterialId: string;
+  rawMaterialName: string;
+  quantityGrams: number;
+  yieldMilliSnapshot: number;
+  expectedOutputGrams: number;
+}
+
+export interface ProductionBatch {
+  id: string;
+  productionDate: string;
+  finishedProductId: string;
+  actualOutputGrams: number;
+  expectedOutputGrams: number;
+  totalInputGrams: number;
+  actualLossGrams: number;
+  expectedLossGrams: number;
+  additionalLossGrams: number;
+  batchCostAfn: number;
+  costPerKgAfn: number;
+  notes: string | null;
+  inputs: ProductionInput[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export function mapFactory(row: FactoryRow): Factory {
   return {
     id: row.id,
