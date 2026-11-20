@@ -1,15 +1,38 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export interface ReportSnapshot {
-  salesAfn: number;
-  purchasesAfn: number;
+  salesPaidAfn: number;
+  purchasesPaidAfn: number;
+  salesLoanAfn: number;
+  purchasesLoanAfn: number;
   businessExpensesAfn: number;
   productionOutputGrams: number;
   finishedStockGrams: number;
-  customerReceivableAfn: number;
-  supplierPayableAfn: number;
-  afnCash: number;
-  usdCash: number;
+}
+
+export interface FinishedStockReportMovement {
+  occurredAt: string;
+  quantityGrams: number;
+}
+
+export async function getFinishedStockReportMovements(
+  db: SQLiteDatabase,
+  factoryId: string
+): Promise<FinishedStockReportMovement[]> {
+  const rows = await db.getAllAsync<{
+    occurred_at: string;
+    quantity_grams: number;
+  }>(
+    `SELECT occurred_at, quantity_grams
+       FROM stock_movements
+      WHERE factory_id = ? AND stock_type = 'finished_product'
+      ORDER BY occurred_at ASC, created_at ASC`,
+    factoryId
+  );
+  return rows.map((row) => ({
+    occurredAt: row.occurred_at,
+    quantityGrams: row.quantity_grams,
+  }));
 }
 
 export async function getReportSnapshot(
@@ -22,37 +45,31 @@ export async function getReportSnapshot(
   };
 
   const [
-    salesAfn,
-    purchasesAfn,
+    salesPaidAfn,
+    purchasesPaidAfn,
+    salesLoanAfn,
+    purchasesLoanAfn,
     businessExpensesAfn,
     productionOutputGrams,
     finishedStockGrams,
-    customerReceivableAfn,
-    supplierPayableAfn,
-    afnCash,
-    usdCash,
   ] = await Promise.all([
-    sum(`SELECT COALESCE(SUM(total_afn), 0) AS value FROM sales WHERE factory_id = ? AND deleted_at IS NULL`),
-    sum(`SELECT COALESCE(SUM(total_afn), 0) AS value FROM purchases WHERE factory_id = ? AND deleted_at IS NULL`),
+    sum(`SELECT COALESCE(SUM(paid_afn), 0) AS value FROM sales WHERE factory_id = ? AND deleted_at IS NULL`),
+    sum(`SELECT COALESCE(SUM(paid_afn), 0) AS value FROM purchases WHERE factory_id = ? AND deleted_at IS NULL`),
+    sum(`SELECT COALESCE(SUM(outstanding_afn), 0) AS value FROM sales WHERE factory_id = ? AND deleted_at IS NULL`),
+    sum(`SELECT COALESCE(SUM(outstanding_afn), 0) AS value FROM purchases WHERE factory_id = ? AND deleted_at IS NULL`),
     sum(`SELECT COALESCE(SUM(amount_afn), 0) AS value FROM business_expenses WHERE factory_id = ? AND deleted_at IS NULL`),
     sum(`SELECT COALESCE(SUM(actual_output_grams), 0) AS value FROM production_batches WHERE factory_id = ? AND deleted_at IS NULL`),
     sum(`SELECT COALESCE(SUM(quantity_grams), 0) AS value FROM stock_movements WHERE factory_id = ? AND stock_type = 'finished_product'`),
-    sum(`SELECT COALESCE(SUM(outstanding_afn), 0) AS value FROM sales WHERE factory_id = ? AND deleted_at IS NULL`),
-    sum(`SELECT COALESCE(SUM(outstanding_afn), 0) AS value FROM purchases WHERE factory_id = ? AND deleted_at IS NULL`),
-    sum(`SELECT COALESCE(SUM(amount_minor), 0) AS value FROM cash_movements WHERE factory_id = ? AND currency = 'AFN'`),
-    sum(`SELECT COALESCE(SUM(amount_minor), 0) AS value FROM cash_movements WHERE factory_id = ? AND currency = 'USD'`),
   ]);
 
   return {
-    salesAfn,
-    purchasesAfn,
+    salesPaidAfn,
+    purchasesPaidAfn,
+    salesLoanAfn,
+    purchasesLoanAfn,
     businessExpensesAfn,
     productionOutputGrams,
     finishedStockGrams,
-    customerReceivableAfn,
-    supplierPayableAfn,
-    afnCash,
-    usdCash,
   };
 }
 

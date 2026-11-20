@@ -2,10 +2,12 @@ import { randomUUID } from 'expo-crypto';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { validateFinanceAmountAfn } from '@/domain/finance';
+import { cashFlowTotalAfn } from '@/domain/money';
 import { toUtcIso } from '@/lib/time';
 
 import { recordAuditEvent } from './audit';
 import { enqueueOutbox } from './outbox';
+import { getLatestRate } from './rates';
 import type {
   BusinessExpense,
   FinanceCategory,
@@ -190,13 +192,25 @@ export async function postBusinessExpense(
     );
     if (!category) throw new Error('دسته‌بندی مصارف معتبر نیست.');
 
-    const afnBalance = await db.getFirstAsync<{ balance: number }>(
-      `SELECT COALESCE(SUM(amount_minor), 0) AS balance
+    const balances = await db.getAllAsync<{ currency: string; balance: number }>(
+      `SELECT currency, COALESCE(SUM(amount_minor), 0) AS balance
          FROM cash_movements
-        WHERE factory_id = ? AND currency = 'AFN'`,
+        WHERE factory_id = ?
+        GROUP BY currency`,
       input.factoryId
     );
-    if ((afnBalance?.balance ?? 0) < input.amountAfn) {
+    const afnCash = balances.find((row) => row.currency === 'AFN')?.balance ?? 0;
+    const legacyUsdCash = balances.find((row) => row.currency === 'USD')?.balance ?? 0;
+    const latestRate = legacyUsdCash === 0 ? null : await getLatestRate(db, input.factoryId);
+    const availableCashAfn = cashFlowTotalAfn(
+      afnCash,
+      legacyUsdCash,
+      latestRate?.rateMilli ?? null
+    );
+    if (availableCashAfn === null) {
+      throw new Error('برای محاسبه نقدی افغانی، نرخ دالر را ثبت کنید.');
+    }
+    if (availableCashAfn < input.amountAfn) {
       throw new Error('نقدی افغانی برای این مصارف کافی نیست.');
     }
 
@@ -265,7 +279,7 @@ export async function postBusinessExpense(
 export async function getBusinessExpenses(
   db: SQLiteDatabase,
   factoryId: string,
-  limit = 50
+  limit: number | null = 50
 ): Promise<BusinessExpense[]> {
   const rows = await db.getAllAsync<BusinessExpenseRow>(
     `SELECT e.*, c.name AS category_name
@@ -273,9 +287,8 @@ export async function getBusinessExpenses(
        JOIN expense_categories c ON c.id = e.category_id
       WHERE e.factory_id = ? AND e.deleted_at IS NULL
       ORDER BY e.expense_date DESC, e.created_at DESC
-      LIMIT ?`,
-    factoryId,
-    limit
+      ${limit === null ? '' : 'LIMIT ?'}`,
+    ...(limit === null ? [factoryId] : [factoryId, limit])
   );
   return rows.map((row) => ({
     id: row.id,

@@ -101,16 +101,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   small: {
-    minHeight: 40,
+    minHeight: 44,
     paddingHorizontal: Spacing.three,
     borderRadius: Radius.sm,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: Spacing.two,
+    maxWidth: '100%',
   },
   label: {
     textAlign: 'center',
+    flexShrink: 1,
   },
 });

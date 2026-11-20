@@ -4,6 +4,41 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 
 ## Get started
 
+### Cloud backup and recovery
+
+Copy `.env.example` to `.env.local` and set `EXPO_PUBLIC_SUPABASE_URL` and
+`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the Supabase project URL and public
+publishable key. Never put a Supabase secret/service-role key in the mobile app.
+
+Deploy the Supabase migrations and the `factory-cloud` Edge Function to the
+same project. The function uses a server-side Supabase secret key and stores
+only a hash of the recovery code; the database table has no client role access.
+Keep the recovery code outside the phone as well: uninstalling the app can
+remove its SecureStore value.
+
+The development-only Admin screen can also clear the local app database and
+the app-owned cloud backup tables. To enable its password check, set
+`FACTORY_ADMIN_RESET_PASSWORD` as a Supabase Edge Function secret; never add it
+to `.env.local` or the mobile app. The cloud reset only truncates
+`factory_cloud_backups` and `factory_recovery_attempts`; it does not clear
+Supabase Auth, Storage, or other project data. The local reset is irreversible.
+
+The Supabase CLI is a project development dependency. From the repository root,
+link the project and deploy both resources:
+
+```sh
+npx supabase login
+npx supabase link --project-ref <project-ref>
+npx supabase db push --remote
+npx supabase functions deploy factory-cloud
+```
+
+The current implementation sends one versioned factory snapshot per manual
+sync (with automatic retries while the app is open and connected) and limits
+each request to 1.5 MB. Configure Supabase and deploy its schema and function
+before enabling this in the app. A live cloud project is required to validate
+end-to-end backup and restore.
+
 1. Install dependencies
 
    ```bash

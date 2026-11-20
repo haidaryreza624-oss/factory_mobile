@@ -1,19 +1,57 @@
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
+import { Platform, type StyleProp, type ViewStyle } from 'react-native';
 
 export type IconName = SymbolViewProps['name'];
 
-export interface IconProps {
+export interface AppIconProps {
   name: IconName;
   size?: number;
   color?: string;
+  accessibilityLabel?: string;
+  style?: StyleProp<ViewStyle>;
 }
 
 /**
- * Platform-aware icon. Pass `{ ios, android }` names so the app uses SF
- * Symbols on iOS and Material Symbols on Android. Every icon used by the app
- * must be listed in one place (`src/constants/icons.ts`) so missing names are
- * caught at build time.
+ * Centralized platform-aware icon component.
+ * iOS uses SF Symbols; Android and web use matching Material Symbols.
  */
-export function Icon({ name, size = 22, color }: IconProps) {
-  return <SymbolView name={name} size={size} tintColor={color} />;
+export function AppIcon({
+  name,
+  size = 22,
+  color,
+  accessibilityLabel,
+  style,
+}: AppIconProps) {
+  let platformName: IconName = name;
+
+  if (typeof name === 'object') {
+    if (Platform.OS === 'ios' && name.ios) {
+      platformName = { ios: name.ios };
+    } else if (Platform.OS === 'web' && name.android) {
+      platformName = { web: name.android };
+    } else if (Platform.OS === 'android' && name.android) {
+      platformName = { android: name.android };
+    } else if (name.ios) {
+      platformName = { ios: name.ios };
+    }
+  }
+
+  return (
+    <SymbolView
+      accessible={Boolean(accessibilityLabel)}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityElementsHidden={!accessibilityLabel}
+      importantForAccessibility={accessibilityLabel ? 'yes' : 'no-hide-descendants'}
+      name={platformName ?? name}
+      size={size}
+      tintColor={color}
+      style={style}
+    />
+  );
+}
+
+export type IconProps = AppIconProps;
+
+export function Icon(props: IconProps) {
+  return <AppIcon {...props} />;
 }

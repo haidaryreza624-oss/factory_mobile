@@ -13,15 +13,12 @@ export interface CreateFactoryInput {
   ownerName: string | null;
   /** Whole AFN. */
   openingAfn: number;
-  /** USD cents. */
-  openingUsd: number;
   now?: string;
 }
 
 export interface CreateFactoryResult {
   factoryId: string;
   afnAccountId: string;
-  usdAccountId: string;
 }
 
 export async function getFactory(db: SQLiteDatabase): Promise<Factory | null> {
@@ -37,7 +34,7 @@ export async function getFactory(db: SQLiteDatabase): Promise<Factory | null> {
 }
 
 /**
- * Creates the local factory, its two cash accounts, opening balances, an
+ * Creates the local factory, its AFN cash account, opening balance, an
  * audit record, and the first outbox entries — all in one transaction.
  */
 export async function createFactoryWithSetup(
@@ -49,19 +46,13 @@ export async function createFactoryWithSetup(
     throw new Error('Factory name is too short.');
   }
 
-  if (
-    !Number.isInteger(input.openingAfn) ||
-    !Number.isInteger(input.openingUsd) ||
-    input.openingAfn < 0 ||
-    input.openingUsd < 0
-  ) {
-    throw new Error('Opening balances must be non-negative integers.');
+  if (!Number.isInteger(input.openingAfn) || input.openingAfn < 0) {
+    throw new Error('Opening cash must be a non-negative integer.');
   }
 
   const now = input.now ?? toUtcIso();
   const factoryId = randomUUID();
   const afnAccountId = randomUUID();
-  const usdAccountId = randomUUID();
   const ownerName = input.ownerName?.trim() || null;
 
   await db.withTransactionAsync(async () => {
@@ -87,18 +78,6 @@ export async function createFactoryWithSetup(
       factoryId,
       'AFN',
       `نقدی ${fa.units.afn}`,
-      now,
-      now
-    );
-
-    await db.runAsync(
-      `INSERT INTO cash_accounts
-         (id, factory_id, currency, name, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 1, ?, ?)`,
-      usdAccountId,
-      factoryId,
-      'USD',
-      `نقدی ${fa.units.usd}`,
       now,
       now
     );
@@ -141,35 +120,6 @@ export async function createFactoryWithSetup(
       );
     }
 
-    if (input.openingUsd > 0) {
-      const movementId = randomUUID();
-
-      await db.runAsync(
-        `INSERT INTO cash_movements
-           (id, factory_id, account_id, currency, amount_minor, source_type, source_id, occurred_at, memo, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
-        movementId,
-        factoryId,
-        usdAccountId,
-        'USD',
-        input.openingUsd,
-        'opening',
-        now,
-        'موجودی اولیه',
-        now
-      );
-
-      await enqueueOutbox(
-        db,
-        {
-          factoryId,
-          entityType: 'cash_movement',
-          entityId: movementId,
-        },
-        now
-      );
-    }
-
     await enqueueOutbox(
       db,
       { factoryId, entityType: 'factory', entityId: factoryId },
@@ -180,12 +130,6 @@ export async function createFactoryWithSetup(
       { factoryId, entityType: 'cash_account', entityId: afnAccountId },
       now
     );
-    await enqueueOutbox(
-      db,
-      { factoryId, entityType: 'cash_account', entityId: usdAccountId },
-      now
-    );
-
     await recordAuditEvent(
       db,
       {
@@ -197,12 +141,11 @@ export async function createFactoryWithSetup(
           name,
           ownerName,
           openingAfn: input.openingAfn,
-          openingUsd: input.openingUsd,
         },
       },
       now
     );
   });
 
-  return { factoryId, afnAccountId, usdAccountId };
+  return { factoryId, afnAccountId };
 }

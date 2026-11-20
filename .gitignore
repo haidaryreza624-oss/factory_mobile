@@ -32,6 +32,9 @@ yarn-error.*
 
 # local env files
 .env*.local
+supabase/functions/.env
+supabase/.temp/
+supabase/.branches/
 
 # typescript
 *.tsbuildinfo
@@ -41,3 +44,4 @@ example
 # generated native folders
 /ios
 /android
+X?!ZVj8yKWigM2B

@@ -2,18 +2,20 @@ import { File, Paths } from 'expo-file-system';
 import { router, useFocusEffect } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
 import { Card } from '@/components/ui/card';
+import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { Icons } from '@/constants/icons';
 import { Spacing } from '@/constants/theme';
 import { getBusinessCsv, getReportSnapshot, type ReportSnapshot } from '@/db/repositories/reports';
 import { useTheme } from '@/hooks/use-theme';
 import { fa } from '@/i18n';
-import { formatAfn, formatKg, formatUsd } from '@/lib/format';
+import { formatAfn, formatKg } from '@/lib/format';
 import { useApp } from '@/providers/app-provider';
 import { useDatabase } from '@/providers/database-provider';
 
@@ -39,6 +41,10 @@ export default function ReportsScreen() {
   }, [db, factory]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  const openReport = (type: string) => {
+    router.push({ pathname: '/report/[type]', params: { type } });
+  };
 
   const exportCsv = async () => {
     if (!factory) return;
@@ -70,20 +76,49 @@ export default function ReportsScreen() {
   return (
     <Screen>
       <ScreenHeader title={fa.reports.title} subtitle={fa.reports.subtitle} onBack={() => router.back()} />
+      <ThemedText type="caption" themeColor="textSecondary">
+        {fa.reports.tapForDetails}
+      </ThemedText>
       {loading ? <View style={styles.loading}><ActivityIndicator color={theme.primary} /></View> : null}
       {error ? <Card tone="danger"><ThemedText type="small" style={{ color: theme.danger }}>{error}</ThemedText></Card> : null}
       {snapshot ? (
         <>
           <View style={styles.grid}>
-            <SummaryCard label={fa.reports.sales} value={formatAfn(snapshot.salesAfn)} />
-            <SummaryCard label={fa.reports.purchases} value={formatAfn(snapshot.purchasesAfn)} />
-            <SummaryCard label={fa.reports.expenses} value={formatAfn(snapshot.businessExpensesAfn)} />
-            <SummaryCard label={fa.reports.production} value={formatKg(snapshot.productionOutputGrams)} />
-            <SummaryCard label={fa.reports.finishedStock} value={formatKg(snapshot.finishedStockGrams)} />
-            <SummaryCard label={fa.reports.customerReceivable} value={formatAfn(snapshot.customerReceivableAfn)} />
-            <SummaryCard label={fa.reports.supplierPayable} value={formatAfn(snapshot.supplierPayableAfn)} />
-            <SummaryCard label={fa.reports.afnCash} value={formatAfn(snapshot.afnCash)} />
-            <SummaryCard label={fa.reports.usdCash} value={formatUsd(snapshot.usdCash)} />
+            <SummaryCard
+              label={fa.reports.salesPaid}
+              value={formatAfn(snapshot.salesPaidAfn)}
+              onPress={() => openReport('sales')}
+            />
+            <SummaryCard
+              label={fa.reports.purchasesPaid}
+              value={formatAfn(snapshot.purchasesPaidAfn)}
+              onPress={() => openReport('purchases')}
+            />
+            <SummaryCard
+              label={fa.reports.salesLoan}
+              value={formatAfn(snapshot.salesLoanAfn)}
+              onPress={() => openReport('sale-loans')}
+            />
+            <SummaryCard
+              label={fa.reports.purchasesLoan}
+              value={formatAfn(snapshot.purchasesLoanAfn)}
+              onPress={() => openReport('purchase-loans')}
+            />
+            <SummaryCard
+              label={fa.reports.expenses}
+              value={formatAfn(snapshot.businessExpensesAfn)}
+              onPress={() => openReport('expenses')}
+            />
+            <SummaryCard
+              label={fa.reports.production}
+              value={formatKg(snapshot.productionOutputGrams)}
+              onPress={() => openReport('production')}
+            />
+            <SummaryCard
+              label={fa.reports.finishedStock}
+              value={formatKg(snapshot.finishedStockGrams)}
+              onPress={() => openReport('stock')}
+            />
           </View>
           <AppButton
             label={fa.reports.exportCsv}
@@ -96,12 +131,34 @@ export default function ReportsScreen() {
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
+function SummaryCard({
+  label,
+  value,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+
   return (
-    <Card style={styles.summaryCard}>
-      <ThemedText type="caption" themeColor="textSecondary">{label}</ThemedText>
-      <ThemedText type="smallBold">{value}</ThemedText>
-    </Card>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.summaryCard, pressed && styles.pressed]}
+    >
+      <Card>
+        <View style={styles.cardContent}>
+          <View style={styles.cardText}>
+            <ThemedText type="caption" themeColor="textSecondary">{label}</ThemedText>
+            <ThemedText type="smallBold">{value}</ThemedText>
+          </View>
+          <Icon name={Icons.chevronLeft} size={18} color={theme.textSecondary} />
+        </View>
+      </Card>
+    </Pressable>
   );
 }
 
@@ -116,4 +173,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: '45%',
   },
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  cardText: {
+    flex: 1,
+    gap: Spacing.two,
+  },
+  pressed: { opacity: 0.72 },
 });

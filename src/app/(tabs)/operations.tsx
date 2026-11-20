@@ -23,7 +23,7 @@ export default function OperationsScreen() {
   ];
 
   return (
-    <Screen>
+    <Screen safeAreaEdges={['top', 'left', 'right']}>
       <ScreenHeader title={fa.operations.title} subtitle={fa.operations.subtitle} />
 
       <ThemedText type="small" themeColor="textSecondary" style={styles.intro}>

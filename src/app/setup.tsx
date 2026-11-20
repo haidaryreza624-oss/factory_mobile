@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -12,7 +12,7 @@ import { ListRow } from '@/components/ui/list-row';
 import { Screen } from '@/components/ui/screen';
 import { Icons } from '@/constants/icons';
 import { Spacing } from '@/constants/theme';
-import { parseAfnInput, parseUsdInput } from '@/domain/money';
+import { parseAfnInput } from '@/domain/money';
 import { createFactoryWithSetup } from '@/db/repositories/factory';
 import { fa } from '@/i18n';
 import { useTheme } from '@/hooks/use-theme';
@@ -22,7 +22,6 @@ import { useDatabase } from '@/providers/database-provider';
 interface FormErrors {
   name?: string;
   afn?: string;
-  usd?: string;
 }
 
 export default function SetupScreen() {
@@ -33,7 +32,6 @@ export default function SetupScreen() {
   const [factoryName, setFactoryName] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [openingAfn, setOpeningAfn] = useState('');
-  const [openingUsd, setOpeningUsd] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -63,11 +61,6 @@ export default function SetupScreen() {
       nextErrors.afn = fa.setup.invalidAfn;
     }
 
-    const usd = parseUsdInput(openingUsd);
-    if (usd === null) {
-      nextErrors.usd = fa.setup.invalidUsd;
-    }
-
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
@@ -82,7 +75,6 @@ export default function SetupScreen() {
         factoryName: name,
         ownerName: ownerName.trim() || null,
         openingAfn: afn ?? 0,
-        openingUsd: usd ?? 0,
       });
 
       await refresh();
@@ -151,21 +143,6 @@ export default function SetupScreen() {
           suffix={fa.units.afn}
         />
 
-        <AppTextInput
-          label={fa.setup.openingUsd}
-          hint={fa.setup.openingUsdHint}
-          placeholder="۰"
-          value={openingUsd}
-          onChangeText={(value) => {
-            setOpeningUsd(value);
-            if (errors.usd) {
-              setErrors((current) => ({ ...current, usd: undefined }));
-            }
-          }}
-          error={errors.usd}
-          keyboardType="decimal-pad"
-          suffix={fa.units.usd}
-        />
       </Card>
 
       <Card padded={false}>
@@ -184,6 +161,12 @@ export default function SetupScreen() {
           </ThemedText>
         </View>
       </Card>
+
+      <AppButton
+        label={fa.cloudBackup.restore}
+        variant="secondary"
+        onPress={() => router.push('/cloud-backup')}
+      />
 
       {submitError ? (
         <Card tone="danger">

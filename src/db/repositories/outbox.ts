@@ -47,3 +47,24 @@ export async function countPendingOutbox(
 
   return row?.count ?? 0;
 }
+
+export async function countDuePendingOutbox(
+  db: SQLiteDatabase,
+  factoryId: string,
+  now: string
+): Promise<number> {
+  const row = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) AS count
+       FROM sync_outbox
+      WHERE factory_id = ?
+        AND synced_at IS NULL
+        AND (
+          last_attempt_at IS NULL OR
+          (julianday(?) - julianday(last_attempt_at)) * 86400 >=
+            MIN(3600, 30 * (1 << MIN(attempt_count, 7)))
+        )`,
+    factoryId,
+    now
+  );
+  return row?.count ?? 0;
+}

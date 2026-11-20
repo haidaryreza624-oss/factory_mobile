@@ -1,24 +1,27 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Icon, type IconName } from '@/components/ui/icon';
+import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { Icons } from '@/constants/icons';
 import { Radius, Spacing } from '@/constants/theme';
 import { getDashboardSnapshot } from '@/db/repositories/dashboard';
+import {
+  getCloudLastSyncedAt,
+  getCloudRevision,
+} from '@/db/repositories/cloud-backup';
 import type { DashboardSnapshot } from '@/db/types';
-import { afnEquivalent } from '@/domain/money';
 import { fa } from '@/i18n';
-import { formatAfn, formatCount, formatRateLine, formatUsd } from '@/lib/format';
+import { formatCount, formatRateLine } from '@/lib/format';
 import { formatJalaliDate } from '@/lib/jalali';
-import { toPersianDigits } from '@/lib/persian';
+import { isCloudConfigured } from '@/lib/cloud-client';
 import { useTheme } from '@/hooks/use-theme';
 import { useApp } from '@/providers/app-provider';
 import { useDatabase } from '@/providers/database-provider';
@@ -31,6 +34,9 @@ export default function DashboardScreen() {
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cloudRevision, setCloudRevision] = useState(0);
+  const [lastCloudSync, setLastCloudSync] = useState<string | null>(null);
+  const [cloudConfigured, setCloudConfigured] = useState(false);
 
   const load = useCallback(async () => {
     if (!factory) {
@@ -39,8 +45,15 @@ export default function DashboardScreen() {
 
     try {
       setError(null);
-      const next = await getDashboardSnapshot(db, factory.id);
+      const [next, revision, lastSyncedAt] = await Promise.all([
+        getDashboardSnapshot(db, factory.id),
+        getCloudRevision(db, factory.id),
+        getCloudLastSyncedAt(db, factory.id),
+      ]);
       setSnapshot(next);
+      setCloudRevision(revision);
+      setLastCloudSync(lastSyncedAt);
+      setCloudConfigured(isCloudConfigured());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : fa.dashboard.loadError);
     } finally {
@@ -62,25 +75,24 @@ export default function DashboardScreen() {
     ? `${fa.dashboard.greeting}، ${factory.ownerName}`
     : fa.dashboard.greeting;
 
-  const showComingSoon = () => {
-    Alert.alert(fa.common.comingSoon, fa.common.comingSoonBody);
-  };
-
-  const quickActions: { label: string; icon: IconName }[] = [
-    { label: fa.dashboard.addPurchase, icon: Icons.cart },
-    { label: fa.dashboard.newProduction, icon: Icons.operations },
-    { label: fa.dashboard.createSale, icon: Icons.receipt },
-    { label: fa.dashboard.addExpense, icon: Icons.wallet },
+  const quickActions = [
+    { label: fa.dashboard.addPurchase, icon: Icons.cart, href: '/purchases' as const },
+    { label: fa.dashboard.newProduction, icon: Icons.operations, href: '/production' as const },
+    { label: fa.dashboard.createSale, icon: Icons.receipt, href: '/sales' as const },
+    { label: fa.dashboard.addExpense, icon: Icons.wallet, href: '/business-expenses' as const },
   ];
 
-  const totalAfn =
-    snapshot && snapshot.todayRate
-      ? snapshot.afnBalance +
-        afnEquivalent('USD', snapshot.usdBalance, snapshot.todayRate.rateMilli)
-      : null;
+  const cloudBackupActive = cloudConfigured && cloudRevision > 0;
+  const cloudStatusText = !cloudConfigured
+    ? fa.dashboard.syncNotConfigured
+    : cloudBackupActive
+      ? lastCloudSync
+        ? `${fa.cloudBackup.lastBackup}: ${new Date(lastCloudSync).toLocaleString('fa-AF')}`
+        : fa.dashboard.syncActive
+      : fa.dashboard.syncNotEnabled;
 
   return (
-    <Screen>
+    <Screen safeAreaEdges={['top', 'left', 'right']}>
       <ScreenHeader
         title={greeting}
         subtitle={`${factory.name} · ${formatJalaliDate(new Date(), { withWeekday: true })}`}
@@ -118,54 +130,6 @@ export default function DashboardScreen() {
 
       {snapshot ? (
         <>
-          <Card style={styles.cashCard}>
-            <View style={styles.cardTitleRow}>
-              <View style={styles.cardTitleRight}>
-                <Icon name={Icons.wallet} size={20} color={theme.primary} />
-                <ThemedText type="subtitle">{fa.dashboard.cashTitle}</ThemedText>
-              </View>
-              {snapshot.pendingSyncCount > 0 ? (
-                <Badge
-                  tone="info"
-                  label={fa.dashboard.syncPending(formatCount(snapshot.pendingSyncCount))}
-                />
-              ) : null}
-            </View>
-
-            <View style={styles.balanceRow}>
-              <View style={styles.balanceColumn}>
-                <ThemedText type="caption" themeColor="textSecondary">
-                  {fa.dashboard.afnCash}
-                </ThemedText>
-                <ThemedText type="number" style={styles.balanceValue} numberOfLines={1}>
-                  {formatAfn(snapshot.afnBalance)}
-                </ThemedText>
-              </View>
-              <View style={[styles.balanceDivider, { backgroundColor: theme.border }]} />
-              <View style={styles.balanceColumn}>
-                <ThemedText type="caption" themeColor="textSecondary">
-                  {fa.dashboard.usdCash}
-                </ThemedText>
-                <ThemedText type="number" style={styles.balanceValue} numberOfLines={1}>
-                  {formatUsd(snapshot.usdBalance)}
-                </ThemedText>
-              </View>
-            </View>
-
-            <View style={[styles.totalRow, { borderTopColor: theme.border }]}>
-              <ThemedText type="small" themeColor="textSecondary">
-                {fa.dashboard.totalCash}
-              </ThemedText>
-              {totalAfn !== null ? (
-                <ThemedText type="smallBold">{formatAfn(totalAfn)}</ThemedText>
-              ) : (
-                <ThemedText type="caption" themeColor="textSecondary" style={styles.totalNote}>
-                  {fa.dashboard.totalCashNeedsRate}
-                </ThemedText>
-              )}
-            </View>
-          </Card>
-
           <Card tone={snapshot.todayRate ? 'success' : 'warning'}>
             <View style={styles.cardTitleRow}>
               <View style={styles.cardTitleRight}>
@@ -217,47 +181,69 @@ export default function DashboardScreen() {
                 <Pressable
                   key={action.label}
                   accessibilityRole="button"
-                  onPress={showComingSoon}
+                  accessibilityLabel={action.label}
+                  onPress={() => router.push(action.href)}
                   style={({ pressed }) => [
                     styles.actionCard,
                     {
                       backgroundColor: pressed ? theme.backgroundSelected : theme.surface,
                       borderColor: theme.border,
+                      opacity: pressed ? 0.86 : 1,
                     },
                   ]}>
                   <View style={[styles.actionIcon, { backgroundColor: theme.primarySoft }]}>
                     <Icon name={action.icon} size={22} color={theme.primary} />
                   </View>
-                  <ThemedText type="small">{action.label}</ThemedText>
-                  <Badge label={fa.common.comingSoon} />
+                  <ThemedText type="smallBold" numberOfLines={2}>
+                    {action.label}
+                  </ThemedText>
                 </Pressable>
               ))}
             </View>
           </View>
 
-          <Card>
-            <View style={styles.syncRow}>
-              <View style={styles.syncTexts}>
-                <ThemedText type="smallBold">{fa.dashboard.syncTitle}</ThemedText>
-                <ThemedText type="caption" themeColor="textSecondary">
-                  {fa.dashboard.syncNotConfigured}
-                </ThemedText>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={fa.dashboard.syncTitle}
+            onPress={() => router.push('/cloud-backup')}
+            style={({ pressed }) => [pressed && styles.cardPressed]}>
+            <Card tone={cloudBackupActive ? 'success' : 'info'}>
+              <View style={styles.syncRow}>
+                <View style={styles.syncTexts}>
+                  <ThemedText type="smallBold">{fa.dashboard.syncTitle}</ThemedText>
+                  <ThemedText type="caption" themeColor="textSecondary">
+                    {cloudStatusText}
+                  </ThemedText>
+                </View>
+                <View
+                  style={[
+                    styles.syncIcon,
+                    {
+                      backgroundColor: cloudBackupActive ? theme.successSoft : theme.infoSoft,
+                    },
+                  ]}>
+                  <Icon
+                    name={cloudBackupActive ? Icons.check : Icons.cloudOff}
+                    size={22}
+                    color={cloudBackupActive ? theme.success : theme.info}
+                  />
+                </View>
+                <Icon name={Icons.chevronLeft} size={18} color={theme.textSecondary} />
               </View>
-              <View style={[styles.syncIcon, { backgroundColor: theme.infoSoft }]}>
-                <Icon name={Icons.cloudOff} size={22} color={theme.info} />
-              </View>
-            </View>
-            <ThemedText type="caption" themeColor="textSecondary">
-              {fa.dashboard.syncLocalOnly}
-              {snapshot.pendingSyncCount > 0
-                ? ` · ${toPersianDigits(String(snapshot.pendingSyncCount))} ریکارد در انتظار`
-                : ''}
-            </ThemedText>
-          </Card>
+              {snapshot.pendingSyncCount > 0 ? (
+                <Badge
+                  tone="warning"
+                  label={fa.dashboard.syncPending(formatCount(snapshot.pendingSyncCount))}
+                />
+              ) : null}
+            </Card>
+          </Pressable>
 
-          <ThemedText type="caption" themeColor="textSecondary" style={styles.footnote}>
-            {fa.dashboard.localNotice}
-          </ThemedText>
+          {cloudRevision === 0 ? (
+            <ThemedText type="caption" themeColor="textSecondary" style={styles.footnote}>
+              {fa.dashboard.localNotice}
+            </ThemedText>
+          ) : null}
         </>
       ) : null}
     </Screen>
@@ -270,10 +256,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     paddingVertical: Spacing.five,
   },
-  cashCard: {
-    gap: Spacing.three,
-    paddingVertical: Spacing.four,
-  },
   cardTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -285,35 +267,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     flexShrink: 1,
-  },
-  balanceRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: Spacing.three,
-  },
-  balanceColumn: {
-    flex: 1,
-    gap: 2,
-  },
-  balanceValue: {
-    fontSize: 22,
-    lineHeight: 32,
-  },
-  balanceDivider: {
-    width: StyleSheet.hairlineWidth,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-    paddingTop: Spacing.three,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  totalNote: {
-    flexShrink: 1,
-    textAlign: 'left',
   },
   rateValue: {
     fontSize: 24,
@@ -333,12 +286,14 @@ const styles = StyleSheet.create({
   actionCard: {
     flexGrow: 1,
     flexBasis: '47%',
-    minWidth: 150,
+    minWidth: 144,
+    minHeight: 104,
     borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.three,
     gap: Spacing.two,
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
   actionIcon: {
     width: 40,
@@ -368,5 +323,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     writingDirection: 'rtl',
     paddingHorizontal: Spacing.three,
+  },
+  cardPressed: {
+    opacity: 0.86,
   },
 });

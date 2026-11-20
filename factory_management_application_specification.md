@@ -21,7 +21,7 @@ The application will bring together:
 -   Production and production-yield tracking
 -   Finished-product inventory
 -   Sales and customer records
--   Multi-currency cash management
+-   Multi-currency buy/sell records with one AFN cash balance
 -   Business expense tracking
 -   A separate personal expense tracker
 -   Dashboards, graphs, history lists, and reports
@@ -242,9 +242,7 @@ as:
 -   Total sales in AFN equivalent.
 -   Total purchases in AFN equivalent.
 -   Business expenses in AFN.
--   Current AFN cash.
--   Current USD cash.
--   Combined cash value in AFN using the latest saved rate.
+-   Current total cash in AFN.
 -   Raw-material stock warnings.
 -   Finished-product stock, if configured.
 -   Today's production and sales activity.
@@ -320,9 +318,9 @@ During material setup, the owner sets a minimum stock level in KG.
 
 ## 6. Purchases and Supplier Management
 
-Purchases record raw materials bought for the factory. The owner has
-stated that supplier payments are cash-only. Purchases may be
-priced/recorded in AFN or USD.
+Purchases record raw materials bought for the factory. Purchases may be
+priced in AFN or USD, and may be paid in full or in installments using
+the selected transaction currency.
 
 ### 6.1 Purchase section dashboard
 
@@ -334,25 +332,33 @@ Suggested summary figures:
 -   Total purchases (AFN equivalent).
 -   Purchases today.
 -   Total KG of raw material purchased.
--   Supplier balances/outstanding amounts, if credit or partial
-    settlement is supported.
+-   Supplier balances and outstanding amounts.
 -   Purchase totals by material.
 -   Purchase totals by supplier.
+-   Total cash paid for purchases in AFN equivalent, using the rate saved
+    with each payment.
 
 The total purchase figure should include AFN purchases directly and USD
 purchases converted to AFN using the exchange rate saved with each
 transaction. Historical AFN equivalents must not change when the daily
-rate changes.
+rate changes. The cash-paid figure is the all-time sum of actual
+supplier-payment records, not the purchase total.
 
 ### 6.2 Purchase currency entry
 
-When entering the purchase section, present two separate currency
-choices:
+The purchase form should guide the owner through one full-page step at a
+time, with visible progress and clear back/continue actions. Use this
+sequence: transaction currency, supplier, material selection, quantity
+and unit price, payment and optional notes, then a review before posting.
+Repeat the material and quantity/price steps only when the owner adds
+another material. Preserve entered values when moving backward.
 
--   USD
--   AFN
-
-Selecting a currency opens the corresponding purchase form.
+Calculate each line total from KG and price per KG, and show the purchase
+total before the payment step. Initialize payment to the full total. Use a
+slider plus an exact amount field to adjust the amount paid; show the
+remaining amount as supplier debt. When the transaction currency is USD,
+show the selected payment's live AFN equivalent using today's saved rate;
+if today's rate is missing, explain that it must be recorded first.
 
 ### 6.3 Purchase form fields
 
@@ -360,7 +366,8 @@ Common fields:
 
 -   Supplier.
 -   Purchase date.
--   Material type.
+-   Raw-material type, with current stock shown for each choice. Select it
+    automatically when only one active material is available.
 -   Quantity in KG.
 -   Price per KG in the selected transaction currency.
 -   Calculated line total.
@@ -373,14 +380,14 @@ calculated total.
 
 ### 6.4 Payment currency and cash handling
 
-The owner described a payment flow in which the app asks whether payment
-was received/paid in the original transaction currency. The
-corresponding cash-account logic is detailed in Section 10.
-
-The same general principles should apply to purchases, with cash
-outflows rather than inflows. The precise treatment of mixed payments,
-partial payments, and any supplier credit should be confirmed before
-implementation.
+The selected purchase currency applies to both the purchase prices and
+payments. Mixed-currency payments are out of scope for now. Partial
+payments may be recorded later in the same currency as the purchase.
+Every USD payment is converted to AFN at the rate saved for its payment
+date. Track the remaining supplier debt in the purchase's original
+currency; later payments reduce that original-currency balance, regardless
+of rate changes. The collection slider starts at the full remaining debt
+and shows a live AFN equivalent for USD using today's saved rate.
 
 ### 6.5 Purchase posting
 
@@ -388,11 +395,11 @@ When a purchase is posted:
 
 -   Increase the relevant raw-material inventory by the purchased KG.
 -   Record the purchase in purchase history.
--   Record the actual cash payment against the correct currency cash
-    account(s).
+-   Subtract the AFN equivalent of any actual payment from the single AFN
+    cash balance.
 -   Preserve original currency, amount, daily exchange rate used, and
     AFN equivalent.
--   Link the stock movement and cash movement to the purchase record.
+-   Link the stock movement and AFN cash movement to the purchase record.
 
 ### 6.6 Purchase history
 
@@ -424,9 +431,9 @@ Supplier profiles may include:
 -   Outstanding balance, if supplier credit/partial payment is
     permitted.
 
-Although the owner described supplier payments as cash-only, whether
-purchases are always paid in full immediately or may be settled in
-multiple cash payments remains to be confirmed.
+Supplier purchases may be paid in installments. Later payments use the
+purchase's selected currency and reduce the AFN outstanding balance by
+the AFN equivalent recorded for each payment.
 
 ------------------------------------------------------------------------
 
@@ -592,6 +599,8 @@ Show:
 -   Sales today.
 -   Total KG sold.
 -   Outstanding customer balances.
+-   Total cash received from sales in AFN equivalent, using the rate
+    saved with each payment.
 -   Sales trend graph.
 -   Sales by customer.
 -   Sales by period.
@@ -601,14 +610,24 @@ Total sales should be based on posted sales/invoices, not just cash
 received. Partial or unpaid sales must still be represented as sales
 while the unpaid portion remains a receivable.
 
+The cash-received figure is the all-time sum of actual customer-payment
+records, not the sales total.
+
 ### 8.2 Sale currency entry
 
-When entering the sales section, present two separate currency choices:
+The sales form should guide the owner through one full-page step at a
+time, with visible progress and clear back/continue actions. Use this
+sequence: customer, finished product, transaction currency, quantity and
+unit price, payment and optional notes, then a review before posting.
+Preserve entered values when moving backward.
 
--   USD
--   AFN
-
-Selecting one opens its corresponding sales form.
+Calculate the sale total from KG and price per KG, and show it before the
+payment step. Initialize customer payment to the full total. Use a slider
+plus an exact amount field to adjust the payment; show the remaining
+amount as customer debt.
+When the transaction currency is USD, show the selected payment's live AFN
+equivalent using today's saved rate; if today's rate is missing, explain
+that it must be recorded first.
 
 ### 8.3 Sales form
 
@@ -616,6 +635,9 @@ Fields should include:
 
 -   Customer.
 -   Sale date.
+-   Finished product, with available stock shown for each choice. Select it
+    automatically when only one product has stock, and prevent sales from
+    exceeding that product's available balance.
 -   Finished product quantity in KG.
 -   Price per KG in the selected transaction currency.
 -   Calculated total.
@@ -625,13 +647,14 @@ Fields should include:
 
 ### 8.4 Payment currency
 
-The app should distinguish the currency in which the sale is priced from
-the currency physically received. The owner described asking whether the
-customer pays in the original transaction currency. The detailed cash
-conversion rules are in Section 10.
-
-Support for mixed-currency payments and multiple/partial payments is
-recommended, but the exact form behavior should be confirmed.
+The selected sale currency applies to both the sale price and payments.
+Mixed-currency payments are out of scope for now. Partial customer
+payments may be recorded later in the same currency as the sale. Each
+USD payment is converted to AFN at the rate saved for its payment date.
+Track the remaining customer debt in the sale's original currency; later
+payments reduce that original-currency balance, regardless of rate
+changes. The collection slider starts at the full remaining debt and shows
+a live AFN equivalent for USD using today's saved rate.
 
 ### 8.5 Sale posting and inventory
 
@@ -639,11 +662,12 @@ When a sale is posted:
 
 -   Decrease finished-product inventory by the quantity sold.
 -   Record the sale and its line items.
--   Record actual payment(s) in the appropriate cash account(s).
+-   Add the AFN equivalent of each actual payment to the single AFN cash
+    balance.
 -   Record any unpaid amount as a customer receivable.
 -   Preserve original sale currency, amount, and transaction-day
     exchange rate/AFN equivalent.
--   Link stock and cash movements to the sale.
+-   Link stock and AFN cash movements to the sale.
 
 ### 8.6 Sales history
 
@@ -739,174 +763,69 @@ owner withdrawal/transfer (see Section 11).
 
 ------------------------------------------------------------------------
 
-## 10. Multi-Currency Cash Management and Exchange-Rate Rules
+## 10. Single AFN Cash Balance and Multi-Currency Transactions
 
-This is a core part of the application. The owner wants two separate
-physical cash balances:
+The app supports AFN and USD as buy/sell transaction currencies, but it
+keeps only one spendable business cash balance: AFN. USD amounts are
+converted to AFN when the transaction or payment is recorded. Do not
+maintain or display separate USD cash.
 
--   AFN cash.
--   USD cash.
+### 10.1 Single cash balance
 
-The app should also display a combined total cash value in AFN.
-
-### 10.1 Separate cash balances
-
-Never merge the physical balances into one account.
-
-Display:
-
--   AFN cash balance.
--   USD cash balance.
--   USD balance converted to AFN using the latest saved daily rate.
--   Combined cash value in AFN.
-
-Example:
-
--   AFN cash: ؋100,000.
--   USD cash: \$500.
--   Current rate: 1 USD = ؋72.
--   USD equivalent: ؋36,000.
--   Combined cash value: ؋136,000.
-
-Changing the current rate changes the displayed AFN valuation of USD
-cash, not the physical USD amount or historical transactions.
+-   Setup records an optional opening AFN balance only.
+-   Sales add only the AFN equivalent of money actually received.
+-   Purchases and business expenses subtract only the AFN amount actually
+    paid.
+-   Unpaid sale and purchase amounts affect receivables/payables, not
+    cash.
+-   Every cash movement is stored in AFN.
 
 ### 10.2 Daily exchange rate
 
--   Daily reminder proposed at 6:00 AM.
--   Owner enters one USD-to-AFN rate for the day.
--   New buy/sell transactions use the current saved rate automatically
-    whenever conversion is required.
--   No need to ask for the rate separately in every form when a valid
-    rate exists.
--   Rate history must be retained.
--   A rate edited during the day applies to new transactions only.
--   Every transaction saves a snapshot of the rate it actually used.
+-   The owner enters one USD-to-AFN rate for the day.
+-   AFN transactions do not require an exchange rate.
+-   A USD sale or purchase requires a saved rate for its transaction
+    date.
+-   New USD payments use the saved rate for the payment date.
+-   Keep the rate history. A rate change applies to new transactions and
+    payments only.
+-   Save the rate used with every USD transaction and payment so that
+    historical AFN values never change.
 
-### 10.3 Transaction currency versus payment currency
+### 10.3 Buy/sell currency and payments
 
-The currency selected for a sale or purchase is the transaction/original
-currency. The currency actually received from a customer or paid to a
-supplier determines which physical cash account changes.
+-   Each purchase or sale has one currency choice: AFN or USD.
+-   The selected currency applies to the item prices and all payments
+    for that record, including later partial payments.
+-   Mixed-currency payments are out of scope for now.
+-   Preserve the original amount and currency in the transaction and
+    payment history.
+-   Convert each USD amount to AFN using the saved rate for that
+    transaction/payment date before updating the AFN cash balance.
+-   Track outstanding loans in the transaction's original currency; later
+    payments reduce that amount in the same currency.
+-   Show the live AFN equivalent for USD payments using today's saved rate
+    in both new-transaction and loan-collection sliders.
 
-The forms should ask whether the payment is made/received in the
-original transaction currency. If not, use the saved daily exchange rate
-to convert.
+### 10.4 Transaction totals and actual cash
 
-### 10.4 USD transaction paid in USD
-
-The owner's stated rule:
-
--   Add the whole-dollar portion to USD cash.
--   Convert any fractional remainder (cents) to AFN using the daily
+-   AFN transaction totals remain in AFN.
+-   USD transaction totals are converted using their saved transaction
     rate.
--   Add that converted remainder to AFN cash.
-
-Illustrative example at 72 AFN/USD:
-
--   USD payment: \$100.50.
--   USD cash increases by \$100.
--   AFN cash increases by ؋36 (the \$0.50 remainder converted at 72).
-
-If the amount is a whole-dollar amount, all of it is added to USD cash
-and no AFN cash is added.
-
-### 10.5 USD transaction paid in AFN
-
--   Convert the payment value to AFN using the daily rate.
--   Add the resulting AFN amount to AFN cash.
--   Do not increase USD cash.
-
-The exact rounding policy for AFN minor units should be defined. AFN
-amounts are expected to be handled as whole Afghanis in the current
-workflow.
-
-### 10.6 AFN transaction paid in AFN
-
--   Add the entire AFN amount to AFN cash.
--   No exchange rate is required.
--   No USD cash is added.
-
-The owner stated that AFN payments are always fixed/whole amounts and do
-not require a fractional remainder conversion when paid in AFN.
-
-### 10.7 AFN transaction paid in USD
-
-The owner's stated rule:
-
--   Convert the AFN payment value to USD using the daily rate.
--   Add the whole-dollar portion to USD cash.
--   Convert the remaining AFN value into AFN cash and add it to AFN
+-   Sales totals include unpaid amounts; only actual receipts increase
     cash.
+-   Purchase totals include unpaid amounts; only actual payments
+    decrease cash.
+-   Original-currency outstanding balances determine loan status and
+    whether a loan is fully settled. AFN loan totals are valued using the
+    transaction's saved rate, while cash movements keep each payment's
+    saved payment-date AFN equivalent.
+-   Customer receivables and supplier payables remain separate from the
+    AFN cash balance.
 
-Illustrative example:
-
--   AFN amount: ؋10,000.
--   Rate: 72 AFN/USD.
--   Mathematical conversion: \$138.88...
--   USD cash increases by \$138.
--   Remaining value of ؋64 stays in AFN cash.
-
-The exact rounding convention should be confirmed (for example, truncate
-to whole dollars rather than round to the nearest dollar), because it
-changes the allocation between the two cash accounts.
-
-### 10.8 Combined cash value
-
-The dashboard's combined cash value is:
-
-`AFN cash + (USD cash × latest saved USD-to-AFN rate)`
-
-This is a display valuation only. It does not physically convert USD
-cash into AFN.
-
-### 10.9 Purchases and sales totals in AFN
-
-Each section must show totals in AFN even when the underlying
-transactions are in USD.
-
-Recommended historical reporting rule:
-
--   AFN transaction: AFN equivalent equals its AFN amount.
--   USD transaction: AFN equivalent is calculated using the
-    daily/transaction rate saved with that transaction.
--   Preserve the original amount and currency.
--   Do not recalculate historical transaction equivalents when a new
-    daily rate is entered.
-
-Thus, total sales and total purchases can be shown in AFN by adding the
-AFN equivalents of all relevant posted transactions.
-
-### 10.10 Cash versus sales/purchase totals
-
-Keep these concepts separate:
-
--   Sales total: based on posted sales, including unpaid amounts.
--   Purchase total: based on posted purchases, not merely cash paid.
--   Cash balance: based only on actual money received or paid.
--   Receivables: customer amounts still owed.
--   Payables: supplier amounts still owed, if supplier credit is
-    supported.
-
-A credit sale increases sales and customer receivables but does not
-increase cash until payment is received. A purchase paid later increases
-purchases and may create a supplier payable, while cash decreases only
-when payment is made.
-
-### 10.11 Currency exchange transactions
-
-If the owner physically exchanges USD for AFN or AFN for USD, record it
-as a separate currency-exchange transaction:
-
--   Source currency and amount.
--   Destination currency and amount.
--   Actual exchange rate.
--   Date.
--   Optional fees.
--   Cash account decreases in the source currency and increases in the
-    destination currency.
-
-A currency exchange is not a sale, purchase, or business expense.
+The Purchases and Sales sections show cash-flow totals in AFN by summing
+the AFN equivalent saved with each payment. These historical totals do
+not use today's rate and do not represent additional cash balances.
 
 ------------------------------------------------------------------------
 
@@ -937,7 +856,7 @@ business expenses, or business profit.
 When the owner takes money from the factory for personal use:
 
 -   Record an owner withdrawal/draw.
--   Reduce the relevant business cash account.
+-   Reduce the single AFN business cash balance.
 -   Record the corresponding personal inflow if the owner wants it
     reflected in personal finance.
 -   Do not classify the withdrawal as a business operating expense.
@@ -945,7 +864,7 @@ When the owner takes money from the factory for personal use:
 When the owner adds personal money to the factory:
 
 -   Record an owner contribution.
--   Increase the relevant business cash account.
+-   Increase the single AFN business cash balance.
 -   Do not classify it as sales revenue.
 
 ------------------------------------------------------------------------
@@ -1004,21 +923,30 @@ and Business Expenses---must include all of the following:
 
 A cross-section report may summarize:
 
--   Sales (AFN equivalent).
--   Purchases (AFN equivalent).
+-   Sales paid (AFN equivalent), excluding unpaid customer balances.
+-   Purchases paid (AFN equivalent), excluding unpaid supplier balances.
+-   Customer sales loans/receivables as a separate total.
+-   Supplier purchase loans/payables as a separate total.
 -   Business expenses (AFN).
 -   Production quantities and costs.
--   Cash balances by currency.
--   Combined cash valuation in AFN.
--   Customer receivables.
--   Supplier payables, if supported.
+-   Total AFN cash balance.
 -   Owner withdrawals and contributions separately.
 
 Do not label sales minus purchases as profit. A proper profit report
 must account for cost of goods sold, inventory valuation, business
 expenses, and other relevant costs.
 
-### 12.6 Drill-down behavior
+### 12.6 Report index and drill-down behavior
+
+Keep the existing Reports overview layout. Make each summary section
+selectable and open a separate report index page for its data: purchases,
+sales, supplier purchase loans, customer sales loans, business expenses,
+production, finished-product stock, and cash movements. Purchase and sale
+loan reports must remain separate.
+
+Each report index page begins with a line chart showing the section's
+progress over time, followed by a complete, scrollable record list in a
+tabular format.
 
 Clicking a dashboard number or graph point should open the relevant
 underlying transaction list. For example, selecting Total Purchases
@@ -1219,7 +1147,6 @@ linked to its source:
 -   Sale payment received.
 -   Purchase payment made.
 -   Business expense paid.
--   Currency exchange.
 -   Owner contribution.
 -   Owner withdrawal.
 -   Refund or correction.
@@ -1332,10 +1259,9 @@ The eventual database may include entities such as:
 
 ### Finance
 
--   Cash accounts (AFN and USD).
+-   AFN cash account and financial movement ledger.
 -   Financial transactions.
 -   Currency rates and rate history.
--   Currency exchange transactions.
 -   Business expense categories.
 -   Business expenses.
 -   Owner contributions/withdrawals.
@@ -1372,32 +1298,28 @@ The following details should be decided before implementation:
 4.  **Production loss:** Should the app allow output to exceed
     configured expected output and show a negative loss/efficiency
     variance?
-5.  **Currency rounding:** For AFN paid in USD, should the USD amount
-    always be truncated to whole dollars, with the remainder retained in
-    AFN? Confirm the exact rounding rule.
-6.  **USD cents:** Does the owner actually receive/pay cents, or should
-    the app only accept whole-dollar cash amounts?
-7.  **Mixed payments:** Can one sale or purchase be settled through
-    multiple payments in AFN and USD, or should each transaction have
-    only one payment currency at a time?
-8.  **Partial payment:** Can customers pay later or in installments?
-    Supplier purchases were described as cash-only, but it remains
-    unclear whether suppliers can be paid partially.
-9.  **Personal finance currency:** Should personal transactions support
+The following currency choices are already agreed: the business keeps
+one AFN cash balance; each sale or purchase uses one currency (AFN or
+USD) for its prices and payments; partial payments use that same
+currency; USD cents are supported; and USD-to-AFN conversion rounds to
+the nearest whole AFN. Mixed-currency payments and separate USD cash are
+out of scope.
+
+5.  **Personal finance currency:** Should personal transactions support
     both AFN and USD, or AFN only?
-10. **Daily rate fallback:** If the owner misses the 6 AM rate entry,
+6.  **Daily rate fallback:** If the owner misses the 6 AM rate entry,
     should the previous rate remain usable with a warning, or should
     conversion transactions be blocked until a new rate is entered?
-11. **Daily production completion:** If several production runs happen
+7.  **Daily production completion:** If several production runs happen
     in one day, should the 4 PM reminder be skipped after the first
     entry, or only after the owner confirms all of today's production
     has been recorded?
-12. **Offline use:** Must the app work fully offline, or is internet
+8.  **Offline use:** Must the app work fully offline, or is internet
     usually available?
-13. **Language:** Is the app required in Dari, English, or both?
-14. **Finished-stock threshold:** Should finished product also have a
+9.  **Language:** Is the app required in Dari, English, or both?
+10. **Finished-stock threshold:** Should finished product also have a
     minimum-stock alert?
-15. **Production overhead:** Should electricity, fuel, and maintenance
+11. **Production overhead:** Should electricity, fuel, and maintenance
     be included in manufacturing cost per KG, or reported only as
     business expenses initially?
 
@@ -1415,9 +1337,8 @@ management system with:
 -   Automatic expected-versus-actual production loss calculations.
 -   Finished-product stock tracking.
 -   Sales and customer records.
--   Separate AFN and USD physical cash balances.
--   A combined cash valuation displayed in AFN using the latest daily
-    rate.
+-   One AFN cash balance; USD sale and purchase payments are converted
+    to AFN using the saved rate for each transaction or payment.
 -   A daily 6 AM exchange-rate reminder, skipped if today's rate is
     already entered.
 -   Automatic use of the saved daily rate in transactions that need
@@ -1436,6 +1357,5 @@ management system with:
 -   Reports with date filters, drill-down into source transactions, and
     export options.
 
-**No implementation has been started or specified by this document.**
-This is the planning and requirements baseline for discussion and
-approval before development.
+This document records the current product requirements and agreed
+decisions; update it when the product direction changes.

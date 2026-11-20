@@ -47,8 +47,17 @@
         }
       ],
       "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "برای افزودن عکس مواد اولیه و محصولات، به عکس‌های شما دسترسی نیاز است.",
+          "cameraPermission": "برای گرفتن عکس از مواد اولیه و محصولات، به دوربین نیاز است.",
+          "microphonePermission": false
+        }
+      ],
       "expo-notifications",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

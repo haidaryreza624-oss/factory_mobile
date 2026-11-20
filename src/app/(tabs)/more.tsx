@@ -13,16 +13,14 @@ import { Spacing } from '@/constants/theme';
 import { fa } from '@/i18n';
 import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/hooks/use-theme';
-import { useApp } from '@/providers/app-provider';
 
 export default function MoreScreen() {
-  const { factory } = useApp();
   const theme = useTheme();
 
   const version = Constants.expoConfig?.version ?? '1.0.0';
 
   return (
-    <Screen>
+    <Screen safeAreaEdges={['top', 'left', 'right']}>
       <ScreenHeader title={fa.more.title} subtitle={fa.more.subtitle} />
 
       <Card padded={false}>
@@ -40,20 +38,22 @@ export default function MoreScreen() {
           onPress={() => router.push('/notifications')}
           showChevron
         />
+      </Card>
+
+      <Card padded={false}>
+        <ListRow
+          icon={Icons.inventory}
+          title={fa.more.rawMaterials}
+          subtitle={fa.more.rawMaterialsBody}
+          onPress={() => router.push('/(tabs)/inventory')}
+          showChevron
+        />
         <ListRow
           icon={Icons.factory}
-          title={factory?.name ?? fa.common.notSet}
-          subtitle={fa.more.business}
-        />
-        <ListRow
-          icon={Icons.person}
-          title={fa.more.owner}
-          value={factory?.ownerName ?? fa.common.notSet}
-        />
-        <ListRow
-          icon={Icons.wallet}
-          title={fa.more.currency}
-          value={fa.units.afn}
+          title={fa.more.finishedProducts}
+          subtitle={fa.more.finishedProductsBody}
+          onPress={() => router.push('/finished-products')}
+          showChevron
         />
       </Card>
 
@@ -66,15 +66,32 @@ export default function MoreScreen() {
           showChevron
         />
         <ListRow
+          icon={Icons.settings}
+          title={fa.more.sliderSettings}
+          subtitle={fa.more.sliderSettingsBody}
+          onPress={() => router.push('/slider-settings')}
+          showChevron
+        />
+        <ListRow
           icon={Icons.cloudOff}
           title={fa.more.sync}
           subtitle={fa.more.syncBody}
-          value={fa.more.syncValue}
+          onPress={() => router.push('/cloud-backup')}
+          showChevron
         />
-        <ListRow icon={Icons.globe} title={fa.more.language} value={fa.more.languageValue} />
-        <ListRow icon={Icons.calendar} title={fa.more.timezone} value={fa.more.timezoneValue} />
-        <ListRow icon={Icons.lock} title={fa.more.security} value={fa.more.securityValue} />
       </Card>
+
+      {__DEV__ ? (
+        <Card padded={false}>
+          <ListRow
+            icon={Icons.settings}
+            title={fa.more.admin}
+            subtitle={fa.more.adminBody}
+            onPress={() => router.push('/admin')}
+            showChevron
+          />
+        </Card>
+      ) : null}
 
       <Card tone="info">
         <View style={styles.noticeRow}>

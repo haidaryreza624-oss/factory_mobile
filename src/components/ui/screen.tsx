@@ -7,7 +7,7 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -18,34 +18,48 @@ export interface ScreenProps extends PropsWithChildren {
   /** Apply standard horizontal page padding. Defaults to true. */
   padded?: boolean;
   contentContainerStyle?: ViewStyle;
+  /** Override safe area edges for screens managed by a tab navigator. */
+  safeAreaEdges?: Edge[];
 }
 
 /**
- * Page shell. `direction: 'rtl'` makes layout deterministic even when the
- * phone itself is set to a left-to-right language (Expo Go cannot force the
- * native RTL flag without a development build).
+ * Page shell. Explicit native direction keeps Expo Go layouts RTL; web uses
+ * the document direction set in the global stylesheet.
  */
 export function Screen({
   children,
   scroll = true,
   padded = true,
   contentContainerStyle,
+  safeAreaEdges = ['top', 'right', 'bottom', 'left'],
 }: ScreenProps) {
   const theme = useTheme();
+  const nativeDirectionStyle = Platform.OS === 'web' ? undefined : styles.rtl;
 
   const content = (
-    <View style={[styles.content, padded && styles.padded, contentContainerStyle]}>{children}</View>
+    <View
+      style={[
+        styles.content,
+        nativeDirectionStyle,
+        padded && styles.padded,
+        contentContainerStyle,
+      ]}>
+      {children}
+    </View>
   );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={['top']}>
+    <SafeAreaView
+      style={[styles.safeArea, nativeDirectionStyle, { backgroundColor: theme.background }]}
+      edges={safeAreaEdges}>
       <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        style={[styles.flex, nativeDirectionStyle]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {scroll ? (
           <ScrollView
-            style={styles.flex}
-            contentContainerStyle={styles.scrollContent}
+            style={[styles.flex, nativeDirectionStyle]}
+            contentContainerStyle={[styles.scrollContent, nativeDirectionStyle]}
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
             {content}
@@ -61,6 +75,8 @@ export function Screen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+  },
+  rtl: {
     direction: 'rtl',
   },
   flex: {

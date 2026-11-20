@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
 import { AppTextInput } from '@/components/ui/app-text-input';
 import { Card } from '@/components/ui/card';
+import { ChoiceGroup } from '@/components/ui/choice-group';
 import { Screen } from '@/components/ui/screen';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { Radius, Spacing } from '@/constants/theme';
@@ -212,36 +213,6 @@ export default function NotificationsScreen() {
     }
   };
 
-  const sendTestNotification = async () => {
-    setError(null);
-    if (permission !== 'granted') {
-      setError(fa.notifications.testNeedsPermission);
-      log('test notification blocked: permission not granted', permission);
-      return;
-    }
-
-    try {
-      const identifier = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: fa.notifications.testTitle,
-          body: fa.notifications.testBody,
-          data: { url: '/rate' },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: 5,
-          repeats: false,
-        },
-      });
-      log('test notification scheduled for 5 seconds', { identifier });
-      setSuccess(fa.notifications.testScheduled);
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
-      setError(message);
-      log('test notification failed', message);
-    }
-  };
-
   const options: {
     key: 'rateEnabled' | 'productionEnabled' | 'lowStockEnabled';
     timeKey: 'rateTime' | 'productionTime' | 'lowStockTime';
@@ -251,7 +222,13 @@ export default function NotificationsScreen() {
     { key: 'productionEnabled', timeKey: 'productionTime', label: fa.notifications.productionReminder },
     { key: 'lowStockEnabled', timeKey: 'lowStockTime', label: fa.notifications.lowStockReminder },
   ];
-
+  const quickTimes = [
+    { id: '06:00', label: '۰۶:۰۰' },
+    { id: '08:00', label: '۰۸:۰۰' },
+    { id: '12:00', label: '۱۲:۰۰' },
+    { id: '16:00', label: '۱۶:۰۰' },
+    { id: '20:00', label: '۲۰:۰۰' },
+  ];
   return (
     <Screen>
       <ScreenHeader title={fa.notifications.title} subtitle={fa.notifications.subtitle} onBack={() => router.back()} />
@@ -266,14 +243,6 @@ export default function NotificationsScreen() {
         ) : null}
       </Card>
 
-      {Platform.OS !== 'web' ? (
-        <AppButton
-          label={fa.notifications.sendTest}
-          variant="secondary"
-          onPress={sendTestNotification}
-        />
-      ) : null}
-
       <Card>
         <View style={styles.settingRow}>
           <ThemedText type="smallBold" style={styles.settingLabel}>
@@ -281,7 +250,9 @@ export default function NotificationsScreen() {
           </ThemedText>
           <Pressable
             accessibilityRole="switch"
+            accessibilityLabel={fa.notifications.all}
             accessibilityState={{ checked: settings.enabled }}
+            hitSlop={9}
             onPress={() => toggle('enabled')}
             style={[
               styles.switch,
@@ -306,7 +277,9 @@ export default function NotificationsScreen() {
             <ThemedText type="smallBold" style={styles.settingLabel}>{option.label}</ThemedText>
             <Pressable
               accessibilityRole="switch"
+              accessibilityLabel={option.label}
               accessibilityState={{ checked: settings[option.key] }}
+              hitSlop={9}
               disabled={!settings.enabled}
               onPress={() => toggle(option.key)}
               style={[
@@ -327,6 +300,15 @@ export default function NotificationsScreen() {
               />
             </Pressable>
           </View>
+          <ChoiceGroup
+            label={fa.notifications.quickTimes}
+            options={quickTimes}
+            value={settings[option.timeKey]}
+            optionColumns={3}
+            onChange={(value) =>
+              setSettings((current) => ({ ...current, [option.timeKey]: value }))
+            }
+          />
           <AppTextInput
             label={fa.notifications.time}
             hint={fa.notifications.timeHint}

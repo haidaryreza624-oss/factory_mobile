@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   afnEquivalent,
   afnToUsdMinor,
+  cashFlowTotalAfn,
   parseAfnInput,
   parseKgInput,
   parseRateToMilli,
@@ -91,6 +92,18 @@ describe('money conversion', () => {
     expect(afnEquivalent('AFN', 5_000, 72_000)).toBe(5_000);
     expect(afnEquivalent('USD', 10_000, 72_000)).toBe(7_200);
     expect(afnEquivalent('USD', 1, 72_000)).toBe(1);
+  });
+
+  it('values a legacy USD cash balance in AFN using the saved rate', () => {
+    expect(cashFlowTotalAfn(2_500, 10_000, 72_000)).toBe(9_700);
+  });
+
+  it('returns the AFN balance when no USD conversion is needed', () => {
+    expect(cashFlowTotalAfn(2_500, 0, null)).toBe(2_500);
+  });
+
+  it('does not value a legacy USD balance when the rate is missing', () => {
+    expect(cashFlowTotalAfn(2_500, 1_000, null)).toBeNull();
   });
 
   it('rejects a zero rate', () => {

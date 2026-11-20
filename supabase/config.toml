@@ -1,0 +1,2 @@
+[functions.factory-cloud]
+verify_jwt = false

@@ -33,8 +33,8 @@ export function IconButton({ icon, label, onPress, color }: IconButtonProps) {
 
 const styles = StyleSheet.create({
   button: {
-    width: 42,
-    height: 42,
+    width: 48,
+    height: 48,
     borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',

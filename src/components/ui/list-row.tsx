@@ -3,12 +3,14 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon, type IconName } from '@/components/ui/icon';
+import { Icons } from '@/constants/icons';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export interface ListRowProps {
   title: string;
   subtitle?: string;
+  leading?: ReactNode;
   icon?: IconName;
   iconTint?: string;
   /** Trailing text value, e.g. a currency balance. */
@@ -21,6 +23,7 @@ export interface ListRowProps {
 export function ListRow({
   title,
   subtitle,
+  leading,
   icon,
   iconTint,
   value,
@@ -33,7 +36,8 @@ export function ListRow({
 
   const body = (
     <>
-      {icon ? (
+      {leading}
+      {!leading && icon ? (
         <View style={[styles.iconBubble, { backgroundColor: theme.primarySoft }]}>
           <Icon name={icon} size={22} color={tint} />
         </View>
@@ -46,18 +50,26 @@ export function ListRow({
             {subtitle}
           </ThemedText>
         ) : null}
+        {value && trailing ? (
+          <View style={styles.valueAndTrailing}>
+            <ThemedText type="smallBold" style={styles.value}>
+              {value}
+            </ThemedText>
+            {trailing}
+          </View>
+        ) : null}
       </View>
 
-      {value ? (
+      {value && !trailing ? (
         <ThemedText type="smallBold" style={styles.value}>
           {value}
         </ThemedText>
       ) : null}
-      {trailing}
+      {!value ? trailing : null}
 
       {showChevron ? (
         <Icon
-          name={{ ios: 'chevron.left', android: 'chevron_left' }}
+          name={Icons.chevronLeft}
           size={18}
           color={theme.textSecondary}
         />
@@ -105,9 +117,18 @@ const styles = StyleSheet.create({
   },
   texts: {
     flex: 1,
+    minWidth: 0,
     gap: 2,
   },
+  valueAndTrailing: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
   value: {
+    maxWidth: '100%',
+    flexShrink: 1,
     textAlign: 'left',
   },
 });

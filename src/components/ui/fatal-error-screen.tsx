@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/app-button';
@@ -16,9 +16,10 @@ export interface FatalErrorScreenProps {
 
 export function FatalErrorScreen({ message, onRetry }: FatalErrorScreenProps) {
   const theme = useTheme();
+  const nativeDirectionStyle = Platform.OS === 'web' ? undefined : styles.rtl;
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.safeArea, nativeDirectionStyle, { backgroundColor: theme.background }]}>
       <View style={styles.container}>
         <View style={[styles.iconBubble, { backgroundColor: theme.dangerSoft }]}>
           <Icon name={Icons.warning} size={34} color={theme.danger} />
@@ -40,6 +41,8 @@ export function FatalErrorScreen({ message, onRetry }: FatalErrorScreenProps) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+  },
+  rtl: {
     direction: 'rtl',
   },
   container: {

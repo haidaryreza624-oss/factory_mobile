@@ -16,10 +16,10 @@ export interface SaveRawMaterialInput {
   factoryId: string;
   id?: string;
   name: string;
-  description?: string;
   minimumStockGrams: number;
   expectedYieldMilli: number;
   initialStockGrams?: number;
+  photoUri?: string | null;
   now?: string;
 }
 
@@ -29,6 +29,7 @@ function mapRawMaterial(row: RawMaterialRow, currentStockGrams = 0): RawMaterial
     factoryId: row.factory_id,
     name: row.name,
     description: row.description,
+    photoUri: row.photo_uri,
     unit: 'KG',
     minimumStockGrams: row.minimum_stock_grams,
     expectedYieldMilli: row.expected_yield_milli,
@@ -107,19 +108,34 @@ export async function saveRawMaterial(
 
   await db.withTransactionAsync(async () => {
     if (input.id) {
-      await db.runAsync(
-        `UPDATE raw_materials
-            SET name = ?, description = ?, minimum_stock_grams = ?,
-                expected_yield_milli = ?, updated_at = ?
-          WHERE id = ? AND factory_id = ?`,
-        name,
-        input.description?.trim() || null,
-        input.minimumStockGrams,
-        input.expectedYieldMilli,
-        now,
-        input.id,
-        input.factoryId
-      );
+      if (input.photoUri === undefined) {
+        await db.runAsync(
+          `UPDATE raw_materials
+              SET name = ?, minimum_stock_grams = ?,
+                  expected_yield_milli = ?, updated_at = ?
+            WHERE id = ? AND factory_id = ?`,
+          name,
+          input.minimumStockGrams,
+          input.expectedYieldMilli,
+          now,
+          input.id,
+          input.factoryId
+        );
+      } else {
+        await db.runAsync(
+          `UPDATE raw_materials
+              SET name = ?, minimum_stock_grams = ?,
+                  expected_yield_milli = ?, photo_uri = ?, updated_at = ?
+            WHERE id = ? AND factory_id = ?`,
+          name,
+          input.minimumStockGrams,
+          input.expectedYieldMilli,
+          input.photoUri,
+          now,
+          input.id,
+          input.factoryId
+        );
+      }
       await recordAuditEvent(db, {
         factoryId: input.factoryId,
         eventType: 'raw_material.updated',
@@ -137,13 +153,13 @@ export async function saveRawMaterial(
       savedId = materialId;
       await db.runAsync(
         `INSERT INTO raw_materials
-           (id, factory_id, name, description, unit, minimum_stock_grams,
+           (id, factory_id, name, description, photo_uri, unit, minimum_stock_grams,
             expected_yield_milli, is_active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'KG', ?, ?, 1, ?, ?)`,
+         VALUES (?, ?, ?, NULL, ?, 'KG', ?, ?, 1, ?, ?)`,
         materialId,
         input.factoryId,
         name,
-        input.description?.trim() || null,
+        input.photoUri ?? null,
         input.minimumStockGrams,
         input.expectedYieldMilli,
         now,
@@ -207,6 +223,56 @@ export async function setRawMaterialActive(
     await recordAuditEvent(db, {
       factoryId,
       eventType: isActive ? 'raw_material.activated' : 'raw_material.deactivated',
+      entityType: 'raw_material',
+      entityId: materialId,
+    }, now);
+    await enqueueOutbox(db, {
+      factoryId,
+      entityType: 'raw_material',
+      entityId: materialId,
+    }, now);
+  });
+}
+
+export async function deleteRawMaterial(
+  db: SQLiteDatabase,
+  factoryId: string,
+  materialId: string,
+  now = toUtcIso()
+): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    const material = await db.getFirstAsync<{ id: string }>(
+      `SELECT id FROM raw_materials
+        WHERE id = ? AND factory_id = ? AND deleted_at IS NULL`,
+      materialId,
+      factoryId
+    );
+    if (!material) throw new Error('ماده اولیه پیدا نشد.');
+
+    const balance = await db.getFirstAsync<{ balance: number }>(
+      `SELECT COALESCE(SUM(quantity_grams), 0) AS balance
+         FROM stock_movements
+        WHERE factory_id = ? AND stock_type = 'raw_material'
+          AND stock_item_id = ?`,
+      factoryId,
+      materialId
+    );
+    if ((balance?.balance ?? 0) !== 0) {
+      throw new Error('برای حذف ماده اولیه، ابتدا موجودی آن را به صفر برسانید.');
+    }
+
+    await db.runAsync(
+      `UPDATE raw_materials
+          SET is_active = 0, deleted_at = ?, updated_at = ?
+        WHERE id = ? AND factory_id = ?`,
+      now,
+      now,
+      materialId,
+      factoryId
+    );
+    await recordAuditEvent(db, {
+      factoryId,
+      eventType: 'raw_material.deleted',
       entityType: 'raw_material',
       entityId: materialId,
     }, now);

@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconButton } from '@/components/ui/icon-button';
+import { Icons } from '@/constants/icons';
 import { Spacing } from '@/constants/theme';
 import { fa } from '@/i18n';
 
@@ -20,7 +21,7 @@ export function ScreenHeader({ title, subtitle, action, onBack }: ScreenHeaderPr
     <View style={styles.container}>
       {onBack ? (
         <IconButton
-          icon={{ ios: 'chevron.right', android: 'chevron_right' }}
+              icon={Icons.chevronRight}
           label={fa.common.back}
           onPress={onBack}
         />
@@ -43,7 +44,7 @@ export function ScreenHeader({ title, subtitle, action, onBack }: ScreenHeaderPr
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.two,
     paddingTop: Spacing.two,
@@ -51,6 +52,7 @@ const styles = StyleSheet.create({
   },
   texts: {
     flex: 1,
+    minWidth: 0,
     gap: Spacing.half,
   },
 });

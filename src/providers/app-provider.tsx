@@ -1,4 +1,5 @@
 import * as SplashScreen from 'expo-splash-screen';
+import * as Network from 'expo-network';
 import {
   createContext,
   useCallback,
@@ -7,11 +8,20 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
+import { AppState } from 'react-native';
 
 import { FatalErrorScreen } from '@/components/ui/fatal-error-screen';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { getFactory } from '@/db/repositories/factory';
+import { countDuePendingOutbox } from '@/db/repositories/outbox';
+import {
+  getCloudRevision,
+  saveCloudSyncFailure,
+} from '@/db/repositories/cloud-backup';
 import type { Factory } from '@/db/types';
+import { CloudBackupError, getStoredRecoveryCode, isCloudConfigured } from '@/lib/cloud-client';
+import { syncLocalCloudBackup } from '@/lib/cloud-backup';
+import { toUtcIso } from '@/lib/time';
 import { useDatabase } from '@/providers/database-provider';
 
 interface AppContextValue {
@@ -32,6 +42,7 @@ export function AppProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const factoryId = factory?.id;
 
   const load = useCallback(async () => {
     const loaded = await getFactory(db);
@@ -63,6 +74,68 @@ export function AppProvider({ children }: PropsWithChildren) {
       cancelled = true;
     };
   }, [attempt, load]);
+
+  useEffect(() => {
+    if (!factoryId || !isCloudConfigured()) return;
+
+    let cancelled = false;
+    let running = false;
+    let foreground = AppState.currentState !== 'background';
+
+    const synchronizeIfNeeded = async (networkState?: Network.NetworkState) => {
+      if (cancelled || running || !foreground) return;
+      running = true;
+      try {
+        const [recoveryCode, revision, pendingCount] = await Promise.all([
+          getStoredRecoveryCode(),
+          getCloudRevision(db, factoryId),
+          countDuePendingOutbox(db, factoryId, toUtcIso()),
+        ]);
+        if (!recoveryCode || revision < 1 || pendingCount === 0) return;
+
+        const state = networkState ?? (await Network.getNetworkStateAsync());
+        if (state.isConnected !== true || state.isInternetReachable === false) return;
+
+        await syncLocalCloudBackup(db, factoryId, recoveryCode);
+      } catch (cause) {
+        if (!cancelled) {
+          const errorCode =
+            cause instanceof CloudBackupError
+              ? cause.code
+              : 'automatic_sync_failed';
+          try {
+            await saveCloudSyncFailure(db, factoryId, errorCode);
+          } catch (saveError) {
+            console.error('Unable to save the automatic cloud sync failure.', saveError);
+          }
+        }
+      } finally {
+        running = false;
+      }
+    };
+
+    const networkSubscription = Network.addNetworkStateListener((state) => {
+      if (state.isConnected === true && state.isInternetReachable !== false) {
+        void synchronizeIfNeeded(state);
+      }
+    });
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      foreground = state === 'active';
+      if (foreground) void synchronizeIfNeeded();
+    });
+    const retryTimer = setInterval(() => {
+      void synchronizeIfNeeded();
+    }, 60_000);
+
+    void synchronizeIfNeeded();
+
+    return () => {
+      cancelled = true;
+      networkSubscription.remove();
+      appStateSubscription.remove();
+      clearInterval(retryTimer);
+    };
+  }, [db, factoryId]);
 
   const refresh = useCallback(async () => {
     await load();

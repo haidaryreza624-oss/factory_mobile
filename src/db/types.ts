@@ -43,14 +43,14 @@ export interface ExchangeRate {
 
 export interface DashboardSnapshot {
   factory: Factory;
-  /** Whole AFN. */
-  afnBalance: number;
-  /** USD cents. */
-  usdBalance: number;
-  latestRate: ExchangeRate | null;
   todayRate: ExchangeRate | null;
   todayDate: string;
   pendingSyncCount: number;
+}
+
+export interface CashFlowTotals {
+  /** Whole AFN equivalent paid or received, using each payment's saved rate. */
+  afn: number;
 }
 
 export interface RawMaterialRow {
@@ -58,6 +58,7 @@ export interface RawMaterialRow {
   factory_id: string;
   name: string;
   description: string | null;
+  photo_uri: string | null;
   unit: string;
   minimum_stock_grams: number;
   expected_yield_milli: number;
@@ -72,6 +73,7 @@ export interface RawMaterial {
   factoryId: string;
   name: string;
   description: string | null;
+  photoUri: string | null;
   unit: 'KG';
   minimumStockGrams: number;
   expectedYieldMilli: number;
@@ -79,6 +81,14 @@ export interface RawMaterial {
   currentStockGrams: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface FinishedProductStock {
+  id: string;
+  name: string;
+  balanceGrams: number;
+  minimumStockGrams: number;
+  photoUri: string | null;
 }
 
 export interface StockMovementRow {
@@ -116,6 +126,7 @@ export interface Supplier {
   name: string;
   phone: string | null;
   address: string | null;
+  photoUri: string | null;
   notes: string | null;
   isActive: boolean;
   createdAt: string;
@@ -131,6 +142,13 @@ export interface PurchaseItem {
   lineTotalMinor: number;
 }
 
+export interface RecordedPayment {
+  currency: Currency;
+  amountMinor: number;
+  exchangeRateMilli: number | null;
+  paidAt: string;
+}
+
 export interface Purchase {
   id: string;
   supplierId: string;
@@ -142,10 +160,12 @@ export interface Purchase {
   exchangeRateMilli: number | null;
   paidAfn: number;
   outstandingAfn: number;
+  outstandingOriginalMinor: number;
   paymentStatus: 'unpaid' | 'partial' | 'paid';
   reference: string | null;
   notes: string | null;
   items: PurchaseItem[];
+  payments: RecordedPayment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -183,6 +203,7 @@ export interface Customer {
   name: string;
   phone: string | null;
   address: string | null;
+  photoUri: string | null;
   notes: string | null;
   isActive: boolean;
   createdAt: string;
@@ -192,6 +213,7 @@ export interface Customer {
 export interface SaleItem {
   id: string;
   finishedProductId: string;
+  finishedProductName: string;
   quantityGrams: number;
   unitPriceMinor: number;
   lineTotalMinor: number;
@@ -208,10 +230,12 @@ export interface Sale {
   exchangeRateMilli: number | null;
   paidAfn: number;
   outstandingAfn: number;
+  outstandingOriginalMinor: number;
   paymentStatus: 'unpaid' | 'partial' | 'paid';
   reference: string | null;
   notes: string | null;
   items: SaleItem[];
+  payments: RecordedPayment[];
   createdAt: string;
   updatedAt: string;
 }

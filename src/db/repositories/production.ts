@@ -11,7 +11,11 @@ import { toUtcIso } from '@/lib/time';
 
 import { recordAuditEvent } from './audit';
 import { enqueueOutbox } from './outbox';
-import type { ProductionBatch, ProductionInput } from '../types';
+import type {
+  FinishedProductStock,
+  ProductionBatch,
+  ProductionInput,
+} from '../types';
 
 export interface ProductionInputDraft {
   rawMaterialId: string;
@@ -21,9 +25,19 @@ export interface ProductionInputDraft {
 export interface PostProductionInput {
   factoryId: string;
   productionDate: string;
+  finishedProductId?: string;
   actualOutputGrams: number;
   inputs: ProductionInputDraft[];
   notes?: string;
+  now?: string;
+}
+
+export interface SaveFinishedProductInput {
+  factoryId: string;
+  id?: string;
+  name: string;
+  minimumStockGrams: number;
+  photoUri?: string | null;
   now?: string;
 }
 
@@ -61,7 +75,7 @@ export async function ensureFinishedProduct(
 ): Promise<string> {
   const existing = await db.getFirstAsync<{ id: string }>(
     `SELECT id FROM finished_products
-      WHERE factory_id = ? AND deleted_at IS NULL
+      WHERE factory_id = ? AND is_active = 1 AND deleted_at IS NULL
       ORDER BY created_at ASC LIMIT 1`,
     factoryId
   );
@@ -92,6 +106,160 @@ export async function ensureFinishedProduct(
   return id;
 }
 
+export async function createFinishedProduct(
+  db: SQLiteDatabase,
+  factoryId: string,
+  name: string,
+  now = toUtcIso()
+): Promise<string> {
+  const trimmedName = name.trim();
+  if (trimmedName.length < 2) throw new Error('نام محصول نهایی باید حداقل دو حرف باشد.');
+
+  const existing = await db.getFirstAsync<{ id: string }>(
+    `SELECT id FROM finished_products
+      WHERE factory_id = ? AND name = ? AND is_active = 1 AND deleted_at IS NULL
+      ORDER BY created_at ASC LIMIT 1`,
+    factoryId,
+    trimmedName
+  );
+  if (existing) return existing.id;
+
+  return saveFinishedProduct(db, {
+    factoryId,
+    name: trimmedName,
+    minimumStockGrams: 0,
+    now,
+  });
+}
+
+export async function saveFinishedProduct(
+  db: SQLiteDatabase,
+  input: SaveFinishedProductInput
+): Promise<string> {
+  const name = input.name.trim();
+  if (name.length < 2) throw new Error('نام محصول نهایی باید حداقل دو حرف باشد.');
+  if (!Number.isInteger(input.minimumStockGrams) || input.minimumStockGrams < 0) {
+    throw new Error('حداقل موجودی محصول معتبر نیست.');
+  }
+
+  const now = input.now ?? toUtcIso();
+  const id = input.id ?? randomUUID();
+  await db.withTransactionAsync(async () => {
+    if (input.id) {
+      const existing = await db.getFirstAsync<{ id: string }>(
+        `SELECT id FROM finished_products
+          WHERE id = ? AND factory_id = ? AND is_active = 1 AND deleted_at IS NULL`,
+        id,
+        input.factoryId
+      );
+      if (!existing) throw new Error('محصول نهایی پیدا نشد.');
+      if (input.photoUri === undefined) {
+        await db.runAsync(
+          `UPDATE finished_products
+              SET name = ?, minimum_stock_grams = ?, updated_at = ?
+            WHERE id = ? AND factory_id = ?`,
+          name,
+          input.minimumStockGrams,
+          now,
+          id,
+          input.factoryId
+        );
+      } else {
+        await db.runAsync(
+          `UPDATE finished_products
+              SET name = ?, minimum_stock_grams = ?, photo_uri = ?, updated_at = ?
+            WHERE id = ? AND factory_id = ?`,
+          name,
+          input.minimumStockGrams,
+          input.photoUri,
+          now,
+          id,
+          input.factoryId
+        );
+      }
+    } else {
+      await db.runAsync(
+        `INSERT INTO finished_products
+           (id, factory_id, name, description, unit, minimum_stock_grams,
+            photo_uri, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, NULL, 'KG', ?, ?, 1, ?, ?)`,
+        id,
+        input.factoryId,
+        name,
+        input.minimumStockGrams,
+        input.photoUri ?? null,
+        now,
+        now
+      );
+    }
+
+    await recordAuditEvent(db, {
+      factoryId: input.factoryId,
+      eventType: input.id ? 'finished_product.updated' : 'finished_product.created',
+      entityType: 'finished_product',
+      entityId: id,
+      details: { name, minimumStockGrams: input.minimumStockGrams },
+    }, now);
+    await enqueueOutbox(db, {
+      factoryId: input.factoryId,
+      entityType: 'finished_product',
+      entityId: id,
+    }, now);
+  });
+
+  return id;
+}
+
+export async function deleteFinishedProduct(
+  db: SQLiteDatabase,
+  factoryId: string,
+  productId: string,
+  now = toUtcIso()
+): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    const product = await db.getFirstAsync<{ id: string }>(
+      `SELECT id FROM finished_products
+        WHERE id = ? AND factory_id = ? AND is_active = 1 AND deleted_at IS NULL`,
+      productId,
+      factoryId
+    );
+    if (!product) throw new Error('محصول نهایی پیدا نشد.');
+
+    const balance = await db.getFirstAsync<{ balance: number }>(
+      `SELECT COALESCE(SUM(quantity_grams), 0) AS balance
+         FROM stock_movements
+        WHERE factory_id = ? AND stock_type = 'finished_product'
+          AND stock_item_id = ?`,
+      factoryId,
+      productId
+    );
+    if ((balance?.balance ?? 0) !== 0) {
+      throw new Error('برای حذف محصول، ابتدا موجودی آن را به صفر برسانید.');
+    }
+
+    await db.runAsync(
+      `UPDATE finished_products
+          SET is_active = 0, deleted_at = ?, updated_at = ?
+        WHERE id = ? AND factory_id = ?`,
+      now,
+      now,
+      productId,
+      factoryId
+    );
+    await recordAuditEvent(db, {
+      factoryId,
+      eventType: 'finished_product.deleted',
+      entityType: 'finished_product',
+      entityId: productId,
+    }, now);
+    await enqueueOutbox(db, {
+      factoryId,
+      entityType: 'finished_product',
+      entityId: productId,
+    }, now);
+  });
+}
+
 export async function getFinishedProductBalance(
   db: SQLiteDatabase,
   factoryId: string
@@ -103,6 +271,39 @@ export async function getFinishedProductBalance(
     factoryId
   );
   return row?.balance ?? 0;
+}
+
+export async function getFinishedProducts(
+  db: SQLiteDatabase,
+  factoryId: string
+): Promise<FinishedProductStock[]> {
+  const rows = await db.getAllAsync<{
+    id: string;
+    name: string;
+    balance_grams: number;
+    minimum_stock_grams: number;
+    photo_uri: string | null;
+  }>(
+    `SELECT product.id, product.name, product.minimum_stock_grams, product.photo_uri,
+            COALESCE(SUM(movement.quantity_grams), 0) AS balance_grams
+       FROM finished_products AS product
+       LEFT JOIN stock_movements AS movement
+         ON movement.factory_id = product.factory_id
+        AND movement.stock_type = 'finished_product'
+        AND movement.stock_item_id = product.id
+      WHERE product.factory_id = ? AND product.is_active = 1
+        AND product.deleted_at IS NULL
+      GROUP BY product.id, product.name
+      ORDER BY product.name ASC`,
+    factoryId
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    balanceGrams: row.balance_grams,
+    minimumStockGrams: row.minimum_stock_grams,
+    photoUri: row.photo_uri,
+  }));
 }
 
 async function calculateWeightedMaterialCostAfn(
@@ -156,7 +357,19 @@ export async function postProduction(
   let batchId = '';
 
   await db.withTransactionAsync(async () => {
-    const finishedProductId = await ensureFinishedProduct(db, input.factoryId, now);
+    let finishedProductId = input.finishedProductId;
+    if (finishedProductId) {
+      const product = await db.getFirstAsync<{ id: string }>(
+        `SELECT id FROM finished_products
+          WHERE id = ? AND factory_id = ? AND is_active = 1 AND deleted_at IS NULL`,
+        finishedProductId,
+        input.factoryId
+      );
+      if (!product) throw new Error('محصول نهایی معتبر انتخاب نشده است.');
+    } else {
+      finishedProductId = await ensureFinishedProduct(db, input.factoryId, now);
+    }
+
     let totalInputGrams = 0;
     let expectedOutputGrams = 0;
     let batchCostAfn = 0;
@@ -201,6 +414,10 @@ export async function postProduction(
         draft.rawMaterialId,
         draft.quantityGrams
       );
+    }
+
+    if (input.actualOutputGrams > totalInputGrams) {
+      throw new Error('محصول واقعی نمی‌تواند از مقدار ماده مصرف‌شده بیشتر باشد.');
     }
 
     const metrics = calculateProductionMetrics(
@@ -302,8 +519,10 @@ export async function postProduction(
     const finishedBalance = await db.getFirstAsync<{ balance: number }>(
       `SELECT COALESCE(SUM(quantity_grams), 0) AS balance
          FROM stock_movements
-        WHERE factory_id = ? AND stock_type = 'finished_product'`,
-      input.factoryId
+        WHERE factory_id = ? AND stock_type = 'finished_product'
+          AND stock_item_id = ?`,
+      input.factoryId,
+      finishedProductId
     );
     const finishedResult = (finishedBalance?.balance ?? 0) + input.actualOutputGrams;
     const finishedMovementId = randomUUID();
@@ -364,16 +583,15 @@ export async function getProductionBatch(
 export async function getProductionBatches(
   db: SQLiteDatabase,
   factoryId: string,
-  limit = 50
+  limit: number | null = 50
 ): Promise<ProductionBatch[]> {
   const batchRows = await db.getAllAsync<ProductionBatchRow>(
     `SELECT *
        FROM production_batches
       WHERE factory_id = ? AND deleted_at IS NULL
       ORDER BY production_date DESC, created_at DESC
-      LIMIT ?`,
-    factoryId,
-    limit
+      ${limit === null ? '' : 'LIMIT ?'}`,
+    ...(limit === null ? [factoryId] : [factoryId, limit])
   );
 
   const batches: ProductionBatch[] = [];

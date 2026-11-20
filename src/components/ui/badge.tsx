@@ -24,7 +24,9 @@ export function Badge({ label, tone = 'default' }: BadgeProps) {
 
   return (
     <View style={[styles.badge, { backgroundColor: tones[tone].backgroundColor }]}>
-      <ThemedText type="caption" style={{ color: tones[tone].color }}>
+      <ThemedText
+        type="caption"
+        style={{ color: tones[tone].color, textAlign: 'center', writingDirection: 'rtl' }}>
         {label}
       </ThemedText>
     </View>
@@ -33,8 +35,11 @@ export function Badge({ label, tone = 'default' }: BadgeProps) {
 
 const styles = StyleSheet.create({
   badge: {
+    minHeight: 28,
     paddingHorizontal: Spacing.two,
     paddingVertical: 3,
     borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

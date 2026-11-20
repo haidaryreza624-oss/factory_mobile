@@ -68,6 +68,17 @@ export function afnEquivalent(
   return currency === 'AFN' ? amountMinor : usdMinorToAfn(amountMinor, rateMilli, 'round');
 }
 
+/** Values any legacy USD cash balance in AFN using the supplied saved rate. */
+export function cashFlowTotalAfn(
+  afnAmount: number,
+  legacyUsdCents: number,
+  rateMilli: number | null
+): number | null {
+  if (legacyUsdCents === 0) return afnAmount;
+  if (rateMilli === null) return null;
+  return afnAmount + afnEquivalent('USD', legacyUsdCents, rateMilli);
+}
+
 /** Trims a milli rate into an editable ASCII string: 72_000 → "72". */
 export function rateMilliToInput(rateMilli: number): string {
   const whole = Math.trunc(rateMilli / 1000);
@@ -151,6 +162,14 @@ export function parseUsdInput(input: string): number | null {
   }
 
   return Math.round(value * 100);
+}
+
+/** Formats an integer AFN or USD minor-unit amount for an editable field. */
+export function moneyMinorToInput(amountMinor: number, currency: Currency): string {
+  if (currency === 'AFN') return String(amountMinor);
+  const dollars = Math.trunc(amountMinor / 100);
+  const cents = String(Math.abs(amountMinor % 100)).padStart(2, '0');
+  return `${dollars}.${cents}`;
 }
 
 /** Parses typed kilograms into grams. */

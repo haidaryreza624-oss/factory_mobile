@@ -1,5 +1,6 @@
 import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
+import { Platform } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { Icons } from '@/constants/icons';
@@ -26,7 +27,7 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: theme.surface,
           borderTopColor: theme.border,
-          direction: 'rtl',
+          ...(Platform.OS === 'web' ? {} : { direction: 'rtl' as const }),
         },
         tabBarLabelStyle: {
           fontSize: 11,

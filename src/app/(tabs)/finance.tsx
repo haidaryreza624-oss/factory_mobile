@@ -2,7 +2,6 @@ import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ListRow } from '@/components/ui/list-row';
 import { Screen } from '@/components/ui/screen';
@@ -15,12 +14,10 @@ export default function FinanceScreen() {
   const features = [
     { title: fa.finance.expenses, body: fa.finance.expensesBody, icon: Icons.receipt, href: '/business-expenses' as const },
     { title: fa.finance.personal, body: fa.finance.personalBody, icon: Icons.person, href: '/personal-finance' as const },
-    { title: fa.finance.exchange, body: fa.finance.exchangeBody, icon: Icons.rate },
-    { title: fa.finance.ownerTransfers, body: fa.finance.ownerTransfersBody, icon: Icons.wallet },
   ];
 
   return (
-    <Screen>
+    <Screen safeAreaEdges={['top', 'left', 'right']}>
       <ScreenHeader title={fa.finance.title} subtitle={fa.finance.subtitle} />
 
       <Card padded={false}>
@@ -30,8 +27,7 @@ export default function FinanceScreen() {
             icon={feature.icon}
             title={feature.title}
             subtitle={feature.body}
-            trailing={feature.href ? undefined : <Badge label={fa.common.comingSoon} />}
-            onPress={feature.href ? () => router.push(feature.href) : undefined}
+            onPress={() => router.push(feature.href)}
           />
         ))}
       </Card>
